@@ -1,0 +1,7 @@
+{
+  "oil_change": 5000,
+  "tyre_rotation": 10000,
+  "brake_fluid": 40000,
+  "coolant": 60000,
+  "transmission_fluid": 80000
+}

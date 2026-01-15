@@ -1,0 +1,26 @@
+[
+  {
+    "part": "Engine Oil",
+    "avg_lifespan_km": 10000,
+    "risk_factor": "Low",
+    "symptom": "Dark color, noisy engine"
+  },
+  {
+    "part": "Brake Pads",
+    "avg_lifespan_km": 40000,
+    "risk_factor": "Critical",
+    "symptom": "Squeaking sound, longer stopping distance"
+  },
+  {
+    "part": "Tyres",
+    "avg_lifespan_km": 50000,
+    "risk_factor": "Critical",
+    "symptom": "Tread depth < 3mm, cracks in sidewall"
+  },
+  {
+    "part": "Car Battery",
+    "avg_lifespan_days": 1460, 
+    "risk_factor": "Medium",
+    "symptom": "Slow engine start, dim lights"
+  }
+]

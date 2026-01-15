@@ -4,3 +4,4 @@ langchain
 pymongo
 python-dotenv
 requests
+dnspython

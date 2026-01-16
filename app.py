@@ -1,44 +1,52 @@
 import streamlit as st
 import database as db
+import logic
 
-st.set_page_config(page_title="Vehicle Safety Bot", page_icon="🚗")
-
+st.set_page_config(page_title="Vehicle Safety Bot", layout="wide")
 st.title("🚗 Vehicle Safety Bot")
 
-# --- PHASE 2: FINAL EXAM (Save/Load Data) ---
-st.header("1. Your Vehicle Profile")
-
-# Create two columns for input
+# --- STEP 1: VEHICLE PROFILE ---
+st.header("1. Vehicle Profile")
 col1, col2 = st.columns(2)
 
 with col1:
-    car_model = st.text_input("Car Model", placeholder="e.g. Toyota Corolla 2018")
-    odometer = st.number_input("Current Odometer (km)", min_value=0, step=100)
+    car_model = st.text_input("Car Model", placeholder="e.g., Honda Civic 2020")
+    odometer = st.number_input("Current Odometer (km)", min_value=0)
 
 with col2:
-    last_oil_change = st.number_input("Last Oil Change at (km)", min_value=0, step=100)
-    city = st.text_input("Your City", placeholder="e.g. Colombo")
+    last_oil = st.number_input("Last Oil Change (km)", min_value=0)
+    city = st.text_input("City for Weather", placeholder="e.g., London")
 
-if st.button("Save Profile to Database"):
-    profile_data = {
-        "car_model": car_model,
-        "odometer": odometer,
-        "last_oil_change": last_oil_change,
-        "city": city
-    }
+if st.button("Save & Analyze"):
+    # Save to Database
+    profile = {"car_model": car_model, "odometer": odometer, "last_oil": last_oil, "city": city}
+    db.save_vehicle_profile(profile)
     
-    success = db.save_vehicle_profile(profile_data)
-    if success:
-        st.success(f"✅ Saved {car_model} to MongoDB!")
-    else:
-        st.error("❌ Failed to save. Check logs.")
+    st.divider()
+    
+    # --- STEP 2: BRAIN CALCULATIONS ---
+    st.header("2. Safety Analysis")
+    
+    # Get Weather Risk
+    w_score, w_desc = logic.get_weather_risk(city)
+    
+    # Get AI Oil Interval
+    recommended_interval = logic.get_oil_interval(car_model)
+    km_since_oil = odometer - last_oil
+    
+    # Simple Math for Maintenance Risk
+    m_score = (km_since_oil / recommended_interval) * 50
+    m_score = min(m_score, 80) # Cap it at 80%
+    
+    total_risk = w_score + m_score
+    
+    # --- STEP 3: DISPLAY RESULTS ---
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Weather Risk", f"{w_score}%", w_desc)
+    c2.metric("Maintenance Risk", f"{int(m_score)}%", f"{km_since_oil}km since last change")
+    c3.metric("Total Road Risk", f"{int(total_risk)}%")
 
-# --- CHECK SAVED DATA ---
-if st.checkbox("Show my saved data from MongoDB"):
-    saved_profile = db.get_vehicle_profile()
-    if saved_profile:
-        st.write(saved_profile)
+    if total_risk > 50:
+        st.error("🚨 HIGH RISK: Drive carefully and check your vehicle maintenance immediately!")
     else:
-        st.warning("No profile found in database.")
-
-st.divider()
+        st.success("✅ Safe to drive! Roads and vehicle look good.")

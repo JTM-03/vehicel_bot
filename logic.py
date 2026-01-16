@@ -1,12 +1,14 @@
 import os
+import time
 import requests
 import streamlit as st
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
+from google.api_core.exceptions import ResourceExhausted
 
 load_dotenv()
 
-# --- 1. SETUP KEYS ---
+# --- 1. SETUP & RETRY LOGIC ---
 def get_keys():
     g_key = st.secrets.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY")
     w_key = st.secrets.get("WEATHER_API_KEY") or os.getenv("WEATHER_API_KEY")
@@ -15,79 +17,103 @@ def get_keys():
 def get_llm():
     g_key, _ = get_keys()
     if not g_key: return None
-    # Using the stable model for 2026
-    return ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=g_key, temperature=0.3)
+    # Switched to 1.5-flash for speed/cost (2.0 is heavy on quotas)
+    return ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=g_key, temperature=0.3)
 
-# --- 2. CALCULATORS (The missing function is here!) ---
-def get_oil_interval(vehicle_name):
-    """Asks AI for the specific oil change interval for this car"""
+def safe_invoke_ai(prompt):
+    """Retries the AI call if it hits a 429 Limit"""
     llm = get_llm()
-    if not llm: return 5000 
+    if not llm: return "AI Key Error"
+    
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = llm.invoke(prompt)
+            return response.content
+        except ResourceExhausted:
+            st.toast(f"⚠️ High traffic. Retrying in 10s... (Attempt {attempt+1}/{max_retries})")
+            time.sleep(10) # Wait 10 seconds before trying again
+        except Exception as e:
+            return f"Error: {str(e)}"
+    return "⚠️ Server is too busy. Please wait 1 minute and try again."
 
-    try:
-        # We force the AI to give us just a number
-        prompt = f"What is the recommended oil change interval in KM for a {vehicle_name}? Output ONLY the number (e.g. 5000)."
-        response = llm.invoke(prompt)
-        # Extract digits only
-        return int(''.join(filter(str.isdigit, response.content)))
-    except:
-        return 5000 # Safety fallback
+# --- 2. ENVIRONMENTAL LOGIC (The "Smart" Part) ---
+def get_environment_context(district):
+    """Maps Sri Lankan districts to logical mechanical risks"""
+    
+    # MOUNTAIN LOGIC
+    mountains = ["Nuwara Eliya", "Kandy", "Badulla", "Ratnapura", "Matale"]
+    # COASTAL LOGIC
+    coastal = ["Galle", "Matara", "Colombo", "Gampaha", "Kalutara", "Trincomalee", "Batticaloa", "Jaffna", "Hambantota", "Puttalam"]
+    # URBAN LOGIC
+    urban = ["Colombo", "Gampaha", "Kandy"]
 
-# --- 3. WEATHER (More Specific) ---
+    context = []
+    
+    if district in mountains:
+        context.append("MOUNTAINOUS TERRAIN: High stress on Brakes, Transmission, and Cooling System.")
+    
+    if district in coastal:
+        context.append("COASTAL AREA: High Salinity Air. Extreme risk of Body Rust and Undercarriage Corrosion.")
+        
+    if district in urban:
+        context.append("HEAVY TRAFFIC ZONE: High engine idle time. Oil degrades faster than mileage suggests.")
+        
+    return " ".join(context) if context else "Standard Driving Conditions."
+
+# --- 3. WEATHER ---
 def get_weather_risk(location):
     _, w_key = get_keys()
     if not w_key: return 0, "Weather Key Missing"
     
-    # We ask for "Location, Country" to be more precise
-    url = f"https://api.openweathermap.org/data/2.5/weather?q={location}&appid={w_key}&units=metric"
+    url = f"https://api.openweathermap.org/data/2.5/weather?q={location},LK&appid={w_key}&units=metric"
     try:
         res = requests.get(url).json()
-        if res.get("cod") != 200: 
-            return 0, f"Location Error: {res.get('message')}"
+        if res.get("cod") != 200: return 0, "Weather Unavailable"
             
         condition = res['weather'][0]['main'].lower()
         desc = res['weather'][0]['description']
         temp = res['main']['temp']
         
-        # Risk Logic
         if "rain" in condition or "storm" in condition:
-            return 25, f"🌧️ Wet Roads ({desc}, {temp}°C)"
-        elif "mist" in condition or "fog" in condition:
-            return 15, f"🌫️ Low Visibility ({desc}, {temp}°C)"
+            return 25, f"🌧️ Wet ({desc}, {temp}°C)"
         else:
-            return 0, f"☀️ Good Conditions ({desc}, {temp}°C)"
+            return 0, f"☀️ Clear ({desc}, {temp}°C)"
     except:
-        return 0, "Weather Unavailable"
+        return 0, "Offline"
 
-# --- 4. THE PRO REPORT GENERATOR ---
-def get_detailed_report(vehicle, odometer, last_oil, recent_repairs, weather_desc):
-    llm = get_llm()
-    if not llm: return "AI Error"
-
-    prompt = f"""
-    Act as a Senior Vehicle Mechanic. Analyze this vehicle:
-    - Car: {vehicle}
-    - Odometer: {odometer} km
-    - Last Service: {last_oil} km
-    - Recent Repairs Done by User: {recent_repairs}
-    - Current Driving Weather: {weather_desc}
-
-    Generate a detailed report with these exact 3 sections:
+# --- 4. THE PRO REPORT ---
+def get_detailed_report(vehicle, odometer, last_oil, repairs, weather, district):
     
-    SECTION 1: NEXT SERVICE
-    - Calculate exactly when the next service is due (in km).
-    - Is it overdue? (Yes/No).
+    # Get the environmental logic
+    env_logic = get_environment_context(district)
+    
+    prompt = f"""
+    Act as a Senior Mechanic in Sri Lanka. 
+    
+    VEHICLE: {vehicle}
+    ODOMETER: {odometer} km
+    LAST SERVICE: {last_oil} km
+    LOCATION: {district}
+    ENVIRONMENT CONTEXT: {env_logic} (IMPORTANT: Use this to adjust advice)
+    RECENT REPAIRS: {repairs}
+    WEATHER: {weather}
 
-    SECTION 2: SPARE PARTS CHECKLIST
-    - List 3-4 specific parts that likely need changing at this mileage (e.g., Timing Belt, Spark Plugs, Brake Pads).
-    - Do NOT suggest parts listed in 'Recent Repairs'.
+    Generate a 3-part report. Be very specific to the Environment Context.
+    
+    1. URGENT ATTENTION
+    - Based on the location ({district}), what specific part fails first? (e.g. if Coastal, check Rust; if Mountain, check Brakes).
+    - Is the oil change due? (Calculate based on standard 5000km interval).
 
-    SECTION 3: WEATHER ADVICE
-    - Give one specific driving tip for the current weather and this car type.
+    2. SPARE PARTS WATCHLIST
+    - List 3 parts to buy soon.
+    
+    3. DRIVING ADVICE
+    - One tip for driving in {district} right now given the weather.
     """
     
-    try:
-        response = llm.invoke(prompt)
-        return response.content
-    except Exception as e:
-        return f"Could not generate report: {str(e)}"
+    return safe_invoke_ai(prompt)
+
+def get_oil_interval(vehicle_name):
+    # Simplified to save tokens/errors
+    return 5000

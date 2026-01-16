@@ -2,54 +2,81 @@ import streamlit as st
 import database as db
 import logic
 
-st.set_page_config(page_title="Vehicle Safety Bot", layout="wide")
-st.title("🚗 AI Vehicle Safety Assistant")
+st.set_page_config(page_title="Pro Vehicle Bot", layout="wide", page_icon="🔧")
 
-# --- 1. DATA INPUT ---
+st.title("🔧 Pro Vehicle Health Monitor")
+st.markdown("Enter your details below for a precision maintenance report.")
+
+# --- SIDEBAR: HISTORY ---
 with st.sidebar:
-    st.header("Settings")
-    if st.button("Clear Database (Reset)"):
-        # Optional: You can add a reset function later
-        st.write("Reset requested")
-
-col1, col2 = st.columns(2)
-with col1:
-    car_model = st.text_input("Car Model", placeholder="e.g., Toyota Prius 2015")
-    odometer = st.number_input("Current Odometer (km)", min_value=0)
-with col2:
-    last_oil = st.number_input("Last Oil Change (km)", min_value=0)
-    city = st.text_input("Current City", placeholder="e.g., New York")
-
-if st.button("Analyze Safety & Fixes"):
-    with st.spinner('AI is analyzing your vehicle safety...'):
-        # Database Save
-        profile = {"car_model": car_model, "odometer": odometer, "last_oil": last_oil, "city": city}
-        db.save_vehicle_profile(profile)
-        
-        # Logic Calculations
-        recommended_interval = logic.get_oil_interval(car_model)
-        km_since_oil = odometer - last_oil
-        w_score, w_desc = logic.get_weather_risk(city)
-        
-        # Risk Score Calculation
-        m_score = min((km_since_oil / recommended_interval) * 60, 80)
-        total_risk = w_score + m_score
-
-        # --- DISPLAY RESULTS ---
-        st.divider()
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Road Weather", f"{w_score}% Risk", w_desc)
-        c2.metric("Vehicle Health", f"{int(m_score)}% Risk", f"{km_since_oil}km since service")
-        c3.metric("Total Safety Score", f"{int(100 - total_risk)}%", delta_color="inverse")
-
-        # --- AI FIX-IT LIST ---
-        st.subheader("🛠️ Recommended Maintenance Fixes")
-        advice = logic.get_maintenance_advice(car_model, km_since_oil, w_desc)
-        st.info(advice)
-
-        if total_risk > 60:
-            st.error("🚨 WARNING: High risk detected! Visit a mechanic soon.")
-        elif total_risk > 30:
-            st.warning("⚠️ ATTENTION: Some maintenance is required to stay safe.")
+    st.header("📂 User History")
+    if st.button("Load Last Saved Profile"):
+        profile = db.get_vehicle_profile()
+        if profile:
+            st.success("Loaded!")
+            st.json(profile)
         else:
-            st.success("✅ Your vehicle is in great shape for current conditions.")
+            st.warning("No history found.")
+
+# --- MAIN INPUT FORM ---
+with st.form("analysis_form"):
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("🚙 Vehicle Details")
+        car_model = st.text_input("Car Model", placeholder="e.g. Toyota Axio 2018 WXB")
+        odometer = st.number_input("Current Odometer (km)", min_value=0, step=100)
+        last_oil = st.number_input("Last Service Mileage (km)", min_value=0, step=100)
+
+    with col2:
+        st.subheader("📍 Location & History")
+        # specific prompt for accuracy
+        location = st.text_input("Specific Location", placeholder="e.g. Piliyandala, Colombo") 
+        recent_repairs = st.text_area("Recent Repairs (Optional)", placeholder="e.g. Changed battery last month, new tires...")
+
+    submitted = st.form_submit_button("📊 Generate Professional Report")
+
+# --- ANALYSIS LOGIC ---
+if submitted:
+    if not car_model or not location:
+        st.error("Please enter Car Model and Location to proceed.")
+    else:
+        with st.spinner('🔍 Analyzing engine data, weather patterns, and maintenance logs...'):
+            
+            # 1. Save Data
+            db.save_vehicle_profile({
+                "car": car_model, 
+                "odo": odometer, 
+                "last_service": last_oil, 
+                "repairs": recent_repairs
+            })
+
+            # 2. Get Data
+            interval = logic.get_oil_interval(car_model)
+            w_risk, w_desc = logic.get_weather_risk(location)
+            
+            # 3. Calculate Basic Health
+            km_driven = odometer - last_oil
+            health_score = 100 - min(((km_driven / interval) * 100), 100)
+            
+            # 4. Get AI Report
+            ai_report = logic.get_detailed_report(car_model, odometer, last_oil, recent_repairs, w_desc)
+
+            # --- DASHBOARD DISPLAY ---
+            st.divider()
+            
+            # Top Metrics
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Weather Condition", w_desc, f"-{w_risk}% Safety")
+            m2.metric("Next Oil Change Due", f"{last_oil + interval} km", f"{interval - km_driven} km remaining")
+            
+            if health_score > 70:
+                m3.metric("Vehicle Health Score", f"{int(health_score)}%", "Excellent")
+            elif health_score > 30:
+                m3.metric("Vehicle Health Score", f"{int(health_score)}%", "Fair", delta_color="off")
+            else:
+                m3.metric("Vehicle Health Score", f"{int(health_score)}%", "Critical", delta_color="inverse")
+
+            # The Detailed Report
+            st.subheader("📋 Professional Mechanic's Report")
+            st.info(ai_report)

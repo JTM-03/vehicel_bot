@@ -13,7 +13,7 @@ def get_keys():
         return os.getenv("GOOGLE_API_KEY"), os.getenv("WEATHER_API_KEY")
 
 google_key, weather_key = get_keys()
-llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=google_key)
+llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest", google_api_key=google_key)
 
 def get_oil_interval(vehicle_name):
     try:

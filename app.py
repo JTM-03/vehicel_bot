@@ -1,27 +1,11 @@
-import streamlit as st
-import logic
-
-st.set_page_config(page_title="Vehicle Pro Bot", page_icon="🚗")
-
-st.title("🚗 Smart Vehicle Diagnostic")
-st.write("Precision advice based on Sri Lankan road conditions.")
-
-with st.form("main_form"):
+# Add these new inputs to your form
+with st.expander("🛠️ Advanced Wear & Tear Details"):
     c1, c2 = st.columns(2)
     with c1:
-        car = st.text_input("Car Model", value="Toyota Axio")
-        odo = st.number_input("Current Mileage (km)", value=50000)
-        last_s = st.number_input("Last Service at (km)", value=45000)
+        tyre_cond = st.selectbox("Tyre Condition", ["New", "Good (Tread visible)", "Fair (Wearing out)", "Low (Bald/Slippery)"])
+        brake_age = st.number_input("How many km since last Brake Pad change?", value=5000)
     with c2:
-        dist = st.selectbox("District", ["Colombo", "Gampaha", "Kalutara", "Kandy", "Galle"])
-        town = st.text_input("Town", value="Kesbewa")
-        repairs = st.text_area("Recent Repairs", placeholder="e.g., Replaced battery")
+        road_type = st.selectbox("Primary Road Type", ["Well Paved (Highway)", "Urban (City Roads)", "Rough (Potholes/Gravel)", "Steep/Hilly"])
+        avg_speed = st.slider("Average Driving Speed (km/h)", 20, 100, 40)
 
-    submit = st.form_submit_button("Generate Professional Report")
-
-if submit:
-    with st.spinner("Analyzing environment and vehicle data..."):
-        report = logic.get_detailed_report(car, odo, last_s, repairs, dist, town)
-        st.markdown("---")
-        st.subheader("📋 Mechanic's Report")
-        st.info(report)
+fuel_type = st.radio("Fuel Type", ["Petrol", "Diesel", "Hybrid", "Electric"], horizontal=True)

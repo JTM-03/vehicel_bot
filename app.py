@@ -1,43 +1,47 @@
 import streamlit as st
 import logic
 
-st.set_page_config(page_title="Sri Lanka Vehicle AI", layout="wide")
-st.title("🛡️ Pro-Diagnostic Vehicle Engine")
+st.set_page_config(page_title="SL Vehicle Diagnostic AI", layout="wide")
+st.title("🛡️ Pro-Diagnostic Vehicle Engine (v2.0)")
 
-with st.form("entry_form"):
-    st.subheader("🚗 Vehicle & Usage Specs")
-    col1, col2, col3 = st.columns(3)
+with st.form("diagnostic_form"):
+    # Basic Specs
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        v_type = st.selectbox("Vehicle Type", ["Petrol/Diesel", "Hybrid", "Full Electric (EV)"])
+        model = st.text_input("Model Name", placeholder="e.g. Toyota Vitz / BYD Atto 3")
+        m_year = st.number_input("Manufacture Year", 1990, 2026, 2018)
+    with c2:
+        odo = st.number_input("Odometer Reading (km)", min_value=0)
+        district = st.selectbox("Primary District", ["Colombo", "Kandy", "Galle", "Nuwara Eliya", "Other"])
+    with c3:
+        tyre_odo = st.number_input("Odometer at last Tyre Change (km)", 0)
+        align = st.selectbox("Alignment Habit", ["Regularly", "Occasionally", "Rarely"])
+        pressure = st.selectbox("Pressure Checks", ["Weekly", "Monthly", "Only when low"])
+
+    st.markdown("### 📅 Recent Trip History (Last 3 Records)")
+    st.info("Identify threats by selecting all road types encountered in one trip.")
     
-    with col1:
-        v_type = st.selectbox("Fuel Type", ["Petrol/Diesel", "Hybrid", "Full Electric (EV)"])
-        model = st.text_input("Model Name", placeholder="Type model here...")
-        m_year = st.number_input("Manufacture Year", min_value=1980, max_value=2026, value=2015)
+    trips = []
+    t_cols = st.columns(3)
+    road_options = ["Carpeted", "City Traffic", "Potholes/Rough", "Mountain Slopes", "Slippery/Muddy"]
     
-    with col2:
-        odo = st.number_input("Current Odometer (km)", min_value=0, step=1000)
-        road_env = st.selectbox("Road Condition", ["Carpeted", "City Traffic", "Potholes/Rough", "Mountain Slopes"])
-        district = st.selectbox("District", ["Colombo", "Kandy", "Galle", "Other"])
+    for i in range(3):
+        with t_cols[i]:
+            st.write(f"**Trip {i+1}**")
+            t_date = st.date_input(f"Date", key=f"d{i}", value=None)
+            t_km = st.number_input(f"Distance (km)", key=f"k{i}", min_value=0)
+            t_roads = st.multiselect(f"Road Types", road_options, key=f"r{i}")
+            trips.append({"date": t_date, "km": t_km, "roads": t_roads})
 
-    with col3:
-        tyre_odo = st.number_input("Odometer at last Tyre Change (km)", min_value=0)
-        align = st.selectbox("Wheel Alignment Frequency", ["Every 5k km", "Every 10k km", "Rarely"])
-        pressure = st.selectbox("Tyre Pressure Checks", ["Weekly", "Monthly", "Only when low"])
-
-    st.markdown("---")
-    st.subheader("📅 Recent Trip History (To check for Oil/Battery Stagnation)")
-    r1, r2 = st.columns(2)
-    with r1:
-        d1 = st.date_input("Last Ride Date", value=None)
-        k1 = st.number_input("Last Ride distance (km)", min_value=0)
-    with r2:
-        d2 = st.date_input("Previous Ride Date", value=None)
-        k2 = st.number_input("Previous Ride distance (km)", min_value=0)
-
-    last_service = st.number_input("Last Major Service (km)", min_value=0)
-    
-    submit = st.form_submit_button("Generate Diagnostic Report")
+    last_service = st.number_input("Last Major Service (km)", 0)
+    submit = st.form_submit_button("Generate Multi-Trip Diagnostic")
 
 if submit:
-    usage = {"dates": [d1, d2], "km": [k1, k2]}
-    report = logic.get_advanced_report(v_type, model, m_year, odo, district, road_env, tyre_odo, align, pressure, last_service, usage)
-    st.markdown(report)
+    # Validate that at least some data exists
+    if not model or not trips[0]['date']:
+        st.error("Please provide the model name and at least one trip record.")
+    else:
+        with st.spinner("Analyzing terrain threats and 2026 market costs..."):
+            report = logic.get_advanced_report(v_type, model, m_year, odo, district, tyre_odo, align, pressure, last_service, trips)
+            st.markdown(report)

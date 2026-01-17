@@ -30,7 +30,8 @@ def get_detailed_report(vehicle, odometer, last_oil, repairs, district, town):
     g_key = st.secrets.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY")
     if not g_key: return "Error: No API Key found."
 
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=g_key)
+   # Change from gemini-2.0-flash to a modern stable version
+llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=g_key)
     env_logic = get_environment_context(district, town)
     
     prompt = f"""

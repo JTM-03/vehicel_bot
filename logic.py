@@ -1,36 +1,40 @@
-def calculate_risk_score(odo, last_oil, brake_age, tyre_cond, road_type, district):
-    """
-    Calculates a safety score from 0-100.
-    """
-    score = 100
-    
-    # 1. Brake Risk (Higher in Hill areas)
-    is_hilly = district.lower() in ["kandy", "nuwara eliya", "badulla", "matale"]
-    if is_hilly and brake_age > 15000:
-        score -= 30  # Critical penalty for old brakes in mountains
-    elif brake_age > 25000:
-        score -= 20
-        
-    # 2. Tyre Risk
-    tyre_map = {"New": 0, "Good": 5, "Fair": 20, "Low": 50}
-    score -= tyre_map.get(tyre_cond, 0)
-    
-    # 3. Road Condition Impact
-    if road_type == "Rough (Potholes/Gravel)":
-        score -= 15 # Suspension stress
-        
-    return max(0, score)
+import os
+import streamlit as st
+from langchain_groq import ChatGroq
 
-def get_pro_report(vehicle, score, env_context, town):
-    # This prompt tells the AI exactly what 'Threats' to look for
-    prompt = f"""
-    Act as a Safety Inspector for {vehicle} in {town}.
-    Vehicle Safety Score: {score}/100.
-    Environmental Threats: {env_context}.
+def generate_predictive_report(vehicle, odo, last_oil, brake_age, tyre_cond, road_type, district, town, trips):
+    # 1. Calculate Average Trip Distance
+    avg_trip = sum(trips) / len(trips)
+    is_short_tripper = avg_trip < 8 # Under 8km is "Short Trip"
     
-    Your task:
-    1. Identify 'Fatal Threats' (e.g., if score < 50 and area is Hilly, focus on Brakes/Tyres).
-    2. Give a specific warning about 'Slippery Roads' or 'Engine Overheating' based on {env_context}.
-    3. Suggest the next 3 specific mechanical actions.
+    # 2. Hill Area Check
+    hilly_districts = ["Kandy", "Nuwara Eliya", "Badulla", "Matale"]
+    is_hill_zone = district in hilly_districts or road_type == "Steep/Hills"
+
+    # 3. Formulate the "Threat Intelligence" for the AI
+    threats = []
+    if is_hill_zone:
+        if brake_age > 15000: threats.append("CRITICAL: Brake pads are aged for mountain descents.")
+        if tyre_cond in ["Low", "Fair"]: threats.append("DANGER: High risk of skidding on slippery hill curves.")
+    
+    if is_short_tripper:
+        threats.append("ENGINE ALERT: Frequent short trips detected. Risk of oil sludge and water contamination.")
+
+    # 4. Connect to Groq
+    api_key = st.secrets.get("GROQ_API_KEY")
+    llm = ChatGroq(model="llama-3.3-70b-versatile", groq_api_key=api_key)
+
+    prompt = f"""
+    Act as a Predictive Automotive AI. 
+    Vehicle: {vehicle} | Location: {town}, {district} | Avg Trip: {avg_trip}km
+    Calculated Threats: {threats}
+    Current Odo: {odo}km | Last Service: {last_oil}km
+
+    Structure your response:
+    1. **SAFETY SCORE**: Out of 100 (Deduct heavily for {threats}).
+    2. **ENVIRONMENTAL THREAT**: Specifically how {town}'s geography and your {avg_trip}km trips affect the engine.
+    3. **URGENT ACTIONS**: What to do in the next 48 hours.
+    4. **TIRE/BRAKE PREDICTION**: Estimated remaining life in km.
     """
-    # ... call Groq/AI ...
+    
+    return llm.invoke(prompt).content

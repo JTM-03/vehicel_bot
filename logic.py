@@ -2,67 +2,70 @@ import streamlit as st
 from langchain_groq import ChatGroq
 from datetime import date
 
-def get_advanced_report(v_type, model, m_year, odo, district, tyre_odo, align, pressure, service, trips):
+def get_advanced_report(v_type, model, m_year, odo, district, tyre_odo, align_km, pressure, service, trips):
     # 1. API Key Check
     api_key = st.secrets.get("GROQ_API_KEY")
     if not api_key:
-        return "⚠️ Please add your GROQ_API_KEY to Streamlit Secrets."
+        return "⚠️ Configuration Error: GROQ_API_KEY missing."
 
-    # 2. Advanced Wear & Severity Logic
+    # 2. Road Severity Calculation
     road_weights = {
-        "Carpeted": 1.0, "City Traffic": 1.2, 
-        "Potholes/Rough": 1.6, "Mountain Slopes": 1.8, "Slippery/Muddy": 1.5
+        "Carpeted": 1.0, "City Traffic": 1.3, 
+        "Potholes/Rough": 1.7, "Mountain Slopes": 1.9, "Slippery/Muddy": 1.6
     }
     
-    total_effective_km = 0
-    max_severity = 1.0
-    
+    total_trip_impact = 0
     for trip in trips:
-        # Get highest weight from selected road types for this trip
-        trip_weight = max([road_weights.get(r, 1.0) for r in trip['roads']]) if trip['roads'] else 1.0
-        total_effective_km += trip['km'] * trip_weight
-        if trip_weight > max_severity: max_severity = trip_weight
+        # Determine the harshest road type in the selection
+        weight = max([road_weights.get(r, 1.0) for r in trip['roads']]) if trip['roads'] else 1.0
+        total_trip_impact += trip['km'] * weight
 
-    # Tyre Wear Prediction (Adjusted for 2026 standards)
-    tyre_life_km = odo - tyre_odo
-    # Factor in maintenance habits
-    habit_penalty = 1.0
-    if align == "Rarely": habit_penalty += 0.3
-    if pressure == "Only when low": habit_penalty += 0.2
+    # 3. Tyre Wear Prediction (KM-based Alignment Logic)
+    tyre_age_actual = odo - tyre_odo
     
-    effective_wear = (tyre_life_km + total_effective_km) * habit_penalty
+    # Alignment Penalty: Base is 5000km. If they wait longer, wear increases.
+    alignment_penalty = 1.0
+    if align_km > 6000:
+        alignment_penalty += (align_km / 10000) # Gradual increase in wear
+    
+    pressure_penalty = 1.3 if pressure == "Only when low" else 1.0
+    ev_penalty = 1.2 if "Electric" in v_type else 1.0 # Heavier curb weight
+    
+    effective_wear = tyre_age_actual * alignment_penalty * pressure_penalty * ev_penalty
 
-    # 3. Stagnation Audit (Checking gaps between the 3 trips)
-    dates = sorted([t['date'] for t in trips if t['date'] is not None])
+    # 4. Stagnation Check
+    valid_dates = sorted([t['date'] for t in trips if t['date'] is not None])
     stagnation_risk = False
-    if len(dates) >= 2:
-        for i in range(len(dates)-1):
-            if (dates[i+1] - dates[i]).days > 14:
+    if len(valid_dates) >= 2:
+        for i in range(len(valid_dates)-1):
+            if (valid_dates[i+1] - valid_dates[i]).days > 14:
                 stagnation_risk = True
 
-    # 4. AI Prompt (Refined for terrain threats and cost separation)
+    # 5. LLM Diagnostic
     llm = ChatGroq(model="llama-3.3-70b-versatile", groq_api_key=api_key)
     
     prompt = f"""
-    Role: Sri Lankan Automotive Diagnostic Expert (2026).
-    Vehicle: {m_year} {model} ({v_type}) in {district}.
-    Recent History: 3 Trips with mixed roads (Max Severity: {max_severity}).
-    Stagnation Risk (>14 days idle): {stagnation_risk}.
-    Effective Tyre Wear: {effective_wear}km.
+    Act as a Master Mechanic. Vehicle: {m_year} {model} ({v_type}). District: {district}.
+    Diagnostic Data:
+    - Odometer: {odo}km.
+    - Tyre Age: {tyre_age_actual}km. Alignment frequency: every {align_km}km.
+    - Effective Tyre Wear: {effective_wear:.0f}km.
+    - Road Severity (Max Weight): {max([road_weights.get(r, 1.0) for t in trips for r in t['roads']] if any(t['roads'] for t in trips) else [1.0])}.
+    - Stagnation Risk: {stagnation_risk}.
 
-    STRICT OUTPUT FORMAT:
+    STRICT FORMAT:
     ### ⚠️ Mechanical Warnings
-    - Analyze terrain-specific threats (e.g., Brake glaze from mountain slopes, suspension stress from potholes).
-    - Identify risks for {v_type}. (If EV: Check Reduction Gear & Battery Thermal. If ICE: Check Oil Viscosity).
-    - Mention "Stagnation Damage" if stagnation_risk is True.
+    - Analyze dangers based on the terrain and vehicle type ({v_type}).
+    - Be concise. Use :red[DANGER], :orange[WARNING], :green[SAFE].
+    - Explain 'Failure Consequence' (what happens if ignored).
 
     ### 💰 Estimated Repair Costs (LKR)
-    - List 2026 market prices for Sri Lanka.
-    - Examples: Semi-Synthetic Oil (12k-15k), EVs Service (10k-25k), Tyres (30k-55k per unit).
+    - List current 2026 Sri Lankan market prices for parts and labor.
+    - Separate by line items.
     """
     
     try:
         response = llm.invoke(prompt)
         return response.content
     except Exception as e:
-        return f"Error: {str(e)}"
+        return f"System Error: {str(e)}"

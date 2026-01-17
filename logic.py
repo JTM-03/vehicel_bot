@@ -1,71 +1,42 @@
 import os
-import time
 import streamlit as st
-from langchain_google_genai import ChatGoogleGenerativeAI
-from google.api_core.exceptions import ResourceExhausted
+from langchain_groq import ChatGroq # NEW: Use Groq instead of Google
 
-def get_environment_context(district, town):
-    """
-    Logical Brain: Maps geography to mechanical risks.
-    Kesbewa is specifically handled as Urban/Traffic.
-    """
-    town_lower = town.lower().strip()
+def get_llm():
+    """Reliable LLM connection using Groq"""
+    # Get the key from Streamlit secrets
+    api_key = st.secrets.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY")
     
-    # 1. MOUNTAIN LOGIC
-    mountains = ["nuwara eliya", "kandy", "badulla", "bandarawela"]
-    
-    # 2. COASTAL LOGIC (Kesbewa is EXCLUDED here)
-    coastal_towns = ["galle", "matara", "negombo", "hikkaduwa", "mount lavinia", "panadura"]
-    
-    # 3. URBAN/TRAFFIC LOGIC (Kesbewa is INCLUDED here)
-    urban_towns = ["colombo", "kesbewa", "piliyandala", "maharagama", "nugegoda", "kaduwela"]
+    if not api_key:
+        st.error("GROQ_API_KEY is missing!")
+        return None
 
-    context = []
-    
-    if town_lower in mountains or district.lower() in ["nuwara eliya", "kandy"]:
-        context.append("⚠️ MOUNTAIN WARNING: Steep terrain detected. Brakes wear 40% faster. Transmission fluid needs frequent checks.")
-    
-    if town_lower in coastal_towns:
-        context.append("🌊 COASTAL WARNING: High salt air. Significant risk of chassis decay. Recommend anti-rust undercoating.")
-        
-    if town_lower in urban_towns or town_lower == "kesbewa":
-        context.append("🚦 URBAN TRAFFIC: Kesbewa/Colombo area. High engine idling. Oil life is shorter than mileage suggests. Check air filters for dust.")
-        
-    return " ".join(context) if context else "Standard driving conditions."
+    # We use Llama 3.3 70B - it's very smart and works great for diagnostics
+    return ChatGroq(
+        model="llama-3.3-70b-versatile", 
+        groq_api_key=api_key,
+        temperature=0.2,
+        max_retries=2
+    )
 
 def get_detailed_report(vehicle, odometer, last_oil, repairs, district, town):
-    g_key = st.secrets.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY")
-    if not g_key: return "API Key not found in Secrets."
+    llm = get_llm()
+    if not llm: return "Configuration Error."
 
-    # Using 2.0-flash for 2026 stability
-    try:
-        llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=g_key)
-    except:
-        # Fallback if 2.0 is not available in your region yet
-        llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest", google_api_key=g_key)
-
-    env_logic = get_environment_context(district, town)
-    
+    # Keep your exact same prompt logic
     prompt = f"""
     Act as a professional Sri Lankan Automotive Engineer.
-    Vehicle: {vehicle}
-    Odometer: {odometer} km
-    Location: {town}, {district}
-    Environmental Logic: {env_logic}
+    Vehicle: {vehicle}, Mileage: {odometer}km, Location: {town}, {district}.
+    Recent Repairs: {repairs}.
     
-    Based on the Environmental Logic above, provide:
-    1. A 'Logical Warning' section explaining how the {town} environment specifically affects this {vehicle}.
-    2. A maintenance schedule for the next 6 months.
-    3. Essential parts to inspect (Brakes, Chassis, or Filters) based on the specific location risk.
+    Provide a professional maintenance report including:
+    1. Environmental risks for {town}.
+    2. Next service mileage.
+    3. Parts to check immediately.
     """
-
-    # Retry mechanism for 429 Errors
-    for attempt in range(3):
-        try:
-            return llm.invoke(prompt).content
-        except ResourceExhausted:
-            time.sleep(5)
-        except Exception as e:
-            return f"Model Error: {str(e)}"
     
-    return "The system is currently overloaded. Please try again in 1 minute."
+    try:
+        response = llm.invoke(prompt)
+        return response.content
+    except Exception as e:
+        return f"System Error: {str(e)}"

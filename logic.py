@@ -2,66 +2,51 @@ import streamlit as st
 from langchain_groq import ChatGroq
 from datetime import date
 
-def get_advanced_report(v_type, model, m_year, odo, district, tyre_odo, align_km, pressure, service, trips):
-    # 1. API Key Check
+def get_advanced_report(v_type, model, m_year, odo, district, city, tyre_odo, align_km, pressure, service, trips):
     api_key = st.secrets.get("GROQ_API_KEY")
     if not api_key:
         return "⚠️ Configuration Error: GROQ_API_KEY missing."
 
-    # 2. Road Severity Calculation
-    road_weights = {
-        "Carpeted": 1.0, "City Traffic": 1.3, 
-        "Potholes/Rough": 1.7, "Mountain Slopes": 1.9, "Slippery/Muddy": 1.6
+    # 1. Environmental & Terrain Weights
+    # Different districts have different "Environmental Stress"
+    env_stress = {
+        "Colombo": 1.2, "Gampaha": 1.2, "Kalutara": 1.3, # Traffic/Humidity
+        "Kandy": 1.5, "Nuwara Eliya": 1.8, "Badulla": 1.7, "Matale": 1.4, # Mountains
+        "Galle": 1.4, "Matara": 1.3, "Hambantota": 1.3, "Jaffna": 1.5, # Coastal Salt
+        "Anuradhapura": 1.4, "Polonnaruwa": 1.4, "Trincomalee": 1.4 # Heat/Dust
     }
-    
-    total_trip_impact = 0
-    for trip in trips:
-        # Determine the harshest road type in the selection
-        weight = max([road_weights.get(r, 1.0) for r in trip['roads']]) if trip['roads'] else 1.0
-        total_trip_impact += trip['km'] * weight
+    stress_factor = env_stress.get(district, 1.0)
 
-    # 3. Tyre Wear Prediction (KM-based Alignment Logic)
-    tyre_age_actual = odo - tyre_odo
-    
-    # Alignment Penalty: Base is 5000km. If they wait longer, wear increases.
-    alignment_penalty = 1.0
-    if align_km > 6000:
-        alignment_penalty += (align_km / 10000) # Gradual increase in wear
-    
-    pressure_penalty = 1.3 if pressure == "Only when low" else 1.0
-    ev_penalty = 1.2 if "Electric" in v_type else 1.0 # Heavier curb weight
-    
-    effective_wear = tyre_age_actual * alignment_penalty * pressure_penalty * ev_penalty
+    # 2. Tyre & Mechanical Wear Calculation
+    tyre_age = max(0, odo - tyre_odo)
+    # Alignment penalty: Standard is every 5000km.
+    align_penalty = 1.0 + (max(0, align_km - 5000) / 10000)
+    effective_wear = tyre_age * stress_factor * align_penalty
 
-    # 4. Stagnation Check
-    valid_dates = sorted([t['date'] for t in trips if t['date'] is not None])
-    stagnation_risk = False
-    if len(valid_dates) >= 2:
-        for i in range(len(valid_dates)-1):
-            if (valid_dates[i+1] - valid_dates[i]).days > 14:
-                stagnation_risk = True
-
-    # 5. LLM Diagnostic
+    # 3. AI Prompt: Localized Diagnostic + 2026 Costing
     llm = ChatGroq(model="llama-3.3-70b-versatile", groq_api_key=api_key)
     
     prompt = f"""
-    Act as a Master Mechanic. Vehicle: {m_year} {model} ({v_type}). District: {district}.
-    Diagnostic Data:
-    - Odometer: {odo}km.
-    - Tyre Age: {tyre_age_actual}km. Alignment frequency: every {align_km}km.
-    - Effective Tyre Wear: {effective_wear:.0f}km.
-    - Road Severity (Max Weight): {max([road_weights.get(r, 1.0) for t in trips for r in t['roads']] if any(t['roads'] for t in trips) else [1.0])}.
-    - Stagnation Risk: {stagnation_risk}.
+    Act as a Sri Lankan Automobile Engineer (2026). 
+    Vehicle: {m_year} {model} ({v_type}). 
+    Location: {city}, {district}.
+    
+    ENVIRONMENTAL CONTEXT:
+    - Local Stress Factor: {stress_factor} (e.g., 1.8 = Mountain/Steep, 1.4 = Coastal/Salt).
+    - Calculated Tyre Wear: {effective_wear:.0f}km effective use.
 
-    STRICT FORMAT:
-    ### ⚠️ Mechanical Warnings
-    - Analyze dangers based on the terrain and vehicle type ({v_type}).
-    - Be concise. Use :red[DANGER], :orange[WARNING], :green[SAFE].
-    - Explain 'Failure Consequence' (what happens if ignored).
+    STRICT OUTPUT STRUCTURE:
+    ### ⚠️ Localized Mechanical Warnings
+    - Address city-specific issues (e.g., if near coast, mention rust/corrosion. If Central, mention brake fade/suspension).
+    - Include specific checks for {v_type} (e.g., Three-wheeler grease points or EV battery cooling).
 
-    ### 💰 Estimated Repair Costs (LKR)
-    - List current 2026 Sri Lankan market prices for parts and labor.
-    - Separate by line items.
+    ### 💰 2026 Costing & Justification
+    - List repair costs in LKR.
+    - JUSTIFICATION: Explain that costs include 18% VAT, 2.5% SSCL, and 2026 import duties (up to 30%). 
+    - Use the 'Market Markup' method (reflecting spare part scarcity).
+
+    ### 🛠️ Suggested Service Centers Near {city}
+    - Suggest 2-3 reputable service centers (e.g., Mag City, Sterling, AA Ceylon, or specialized local garages like LOLC Motors).
     """
     
     try:

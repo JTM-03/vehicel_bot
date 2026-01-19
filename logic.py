@@ -30,15 +30,20 @@ def get_advanced_report(v_type, model, m_year, odo, district, city, tyre_odo, al
     except Exception as e: return f"Error: {e}"
 
 def analyze_photo_and_chat(image_file, user_query, vehicle_context):
+    from langchain_core.messages import HumanMessage
+    
     vision_llm = get_llm("llama-3.2-11b-vision-preview")
     image_data = base64.b64encode(image_file.read()).decode("utf-8")
     
-    prompt = [
-        {"role": "user", "content": [
-            {"type": "text", "text": f"Context: {vehicle_context}. User Question: {user_query}. Analyze the image for errors/maintenance needs. Provide 2026 LKR costs (inc. 18% VAT)."},
-            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}}
-        ]}
-    ]
     try:
-        return vision_llm.invoke(prompt).content
-    except Exception as e: return "I couldn't analyze the image. Please ensure it's clear."
+        message = HumanMessage(
+            content=[
+                {"type": "text", "text": f"Context: {vehicle_context}\n\nUser Question: {user_query}\n\nAnalyze this vehicle image for maintenance needs, errors, or concerns. Provide estimated 2026 LKR repair costs (including 18% VAT and 2.5% SSCL)."},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}}
+            ]
+        )
+        response = vision_llm.invoke([message])
+        return response.content
+    except Exception as e:
+        print(f"Image analysis error: {str(e)}")
+        return f"I couldn't analyze the image. Please ensure it's clear and try again. (Error: {type(e).__name__})"

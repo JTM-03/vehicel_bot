@@ -1,56 +1,50 @@
 import streamlit as st
 from langchain_groq import ChatGroq
-from datetime import date
 
-def get_advanced_report(v_type, model, m_year, odo, district, city, tyre_odo, align_km, pressure, service, trips):
+def get_advanced_report(v_type, model, m_year, odo, district, city, tyre_odo, align_odo, pressure, service_odo, trips):
     api_key = st.secrets.get("GROQ_API_KEY")
-    if not api_key:
-        return "⚠️ Configuration Error: GROQ_API_KEY missing."
+    if not api_key: return "⚠️ GROQ_API_KEY missing in Secrets."
 
-    # 1. Environmental & Terrain Weights
-    # Different districts have different "Environmental Stress"
-    env_stress = {
-        "Colombo": 1.2, "Gampaha": 1.2, "Kalutara": 1.3, # Traffic/Humidity
-        "Kandy": 1.5, "Nuwara Eliya": 1.8, "Badulla": 1.7, "Matale": 1.4, # Mountains
-        "Galle": 1.4, "Matara": 1.3, "Hambantota": 1.3, "Jaffna": 1.5, # Coastal Salt
-        "Anuradhapura": 1.4, "Polonnaruwa": 1.4, "Trincomalee": 1.4 # Heat/Dust
-    }
-    stress_factor = env_stress.get(district, 1.0)
-
-    # 2. Tyre & Mechanical Wear Calculation
-    tyre_age = max(0, odo - tyre_odo)
-    # Alignment penalty: Standard is every 5000km.
-    align_penalty = 1.0 + (max(0, align_km - 5000) / 10000)
-    effective_wear = tyre_age * stress_factor * align_penalty
-
-    # 3. AI Prompt: Localized Diagnostic + 2026 Costing
+    # 1. Calculation Logic
+    # Alignment health is now based on 'odo' vs 'last alignment odo'
+    align_gap = max(0, odo - align_odo)
+    service_gap = max(0, odo - service_odo)
+    
+    # 2. Market Costing (SL 2026 Standards)
+    # Using 'Market-Linked Markup' (MLM) with 18% VAT & 2.5% SSCL
     llm = ChatGroq(model="llama-3.3-70b-versatile", groq_api_key=api_key)
     
     prompt = f"""
-    Act as a Sri Lankan Automobile Engineer (2026). 
-    Vehicle: {m_year} {model} ({v_type}). 
-    Location: {city}, {district}.
-    
-    ENVIRONMENTAL CONTEXT:
-    - Local Stress Factor: {stress_factor} (e.g., 1.8 = Mountain/Steep, 1.4 = Coastal/Salt).
-    - Calculated Tyre Wear: {effective_wear:.0f}km effective use.
+    Act as a Sri Lankan Automobile Engineer (2026).
+    Vehicle: {m_year} {model} ({v_type}). Location: {city}, {district}.
+    Current Odo: {odo}km. Last Alignment at: {align_odo}km. Last Service at: {service_odo}km.
 
-    STRICT OUTPUT STRUCTURE:
-    ### ⚠️ Localized Mechanical Warnings
-    - Address city-specific issues (e.g., if near coast, mention rust/corrosion. If Central, mention brake fade/suspension).
-    - Include specific checks for {v_type} (e.g., Three-wheeler grease points or EV battery cooling).
+    STRICT OUTPUT FORMAT:
+    ### ⚠️ {district} Area Warnings
+    - Mention specific environmental threats (e.g., salt in {district} if coastal, hills if Central).
+    - Analyze {v_type} specific risks (Motorbikes: chain/forks, 3-Wheelers: gear cables/grease).
 
-    ### 💰 2026 Costing & Justification
-    - List repair costs in LKR.
-    - JUSTIFICATION: Explain that costs include 18% VAT, 2.5% SSCL, and 2026 import duties (up to 30%). 
-    - Use the 'Market Markup' method (reflecting spare part scarcity).
+    ### 💰 Costing Justification (LKR)
+    - Provide estimated 2026 costs. 
+    - JUSTIFICATION: Mention VAT (18%) and SSCL (2.5%) applied to spare parts imports.
+    - Mention why {city} prices might vary (logistics/labour).
 
-    ### 🛠️ Suggested Service Centers Near {city}
-    - Suggest 2-3 reputable service centers (e.g., Mag City, Sterling, AA Ceylon, or specialized local garages like LOLC Motors).
+    ### 🛠️ Local Service Partners
+    - Suggest 2-3 reliable garages near {city} (e.g., Mag City, DPMC, or regional masters).
     """
-    
     try:
-        response = llm.invoke(prompt)
-        return response.content
+        return llm.invoke(prompt).content
     except Exception as e:
-        return f"System Error: {str(e)}"
+        return f"Error: {str(e)}"
+
+def process_chat_update(user_input, current_state):
+    # This function uses AI to "extract" updates from a chat message
+    llm = ChatGroq(model="llama-3.1-8b-instant", groq_api_key=st.secrets["GROQ_API_KEY"])
+    prompt = f"""
+    User says: "{user_input}"
+    Current vehicle data: {current_state}
+    If the user mentioned a new odometer, model, or maintenance update, return ONLY a JSON block with the updated fields. 
+    Otherwise, return "NO_UPDATE".
+    """
+    # Simplified for this demo: the AI handles the natural language extraction
+    return llm.invoke(prompt).content

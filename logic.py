@@ -1,50 +1,44 @@
 import streamlit as st
 from langchain_groq import ChatGroq
+import base64
+from datetime import datetime
+
+# Initialize the LLM
+def get_llm(model_name="llama-3.3-70b-versatile"):
+    return ChatGroq(model=model_name, groq_api_key=st.secrets["GROQ_API_KEY"])
 
 def get_advanced_report(v_type, model, m_year, odo, district, city, tyre_odo, align_odo, pressure, service_odo, trips):
-    api_key = st.secrets.get("GROQ_API_KEY")
-    if not api_key: return "⚠️ GROQ_API_KEY missing in Secrets."
-
-    # 1. Calculation Logic
-    # Alignment health is now based on 'odo' vs 'last alignment odo'
-    align_gap = max(0, odo - align_odo)
-    service_gap = max(0, odo - service_odo)
-    
-    # 2. Market Costing (SL 2026 Standards)
-    # Using 'Market-Linked Markup' (MLM) with 18% VAT & 2.5% SSCL
-    llm = ChatGroq(model="llama-3.3-70b-versatile", groq_api_key=api_key)
+    llm = get_llm()
     
     prompt = f"""
-    Act as a Sri Lankan Automobile Engineer (2026).
+    Act as a Sri Lankan Automobile Engineer (2026). 
     Vehicle: {m_year} {model} ({v_type}). Location: {city}, {district}.
-    Current Odo: {odo}km. Last Alignment at: {align_odo}km. Last Service at: {service_odo}km.
+    Odo: {odo}km. Maintenance: Last Service {service_odo}km, Last Alignment {align_odo}km.
 
-    STRICT OUTPUT FORMAT:
-    ### ⚠️ {district} Area Warnings
-    - Mention specific environmental threats (e.g., salt in {district} if coastal, hills if Central).
-    - Analyze {v_type} specific risks (Motorbikes: chain/forks, 3-Wheelers: gear cables/grease).
-
-    ### 💰 Costing Justification (LKR)
-    - Provide estimated 2026 costs. 
-    - JUSTIFICATION: Mention VAT (18%) and SSCL (2.5%) applied to spare parts imports.
-    - Mention why {city} prices might vary (logistics/labour).
-
-    ### 🛠️ Local Service Partners
-    - Suggest 2-3 reliable garages near {city} (e.g., Mag City, DPMC, or regional masters).
+    STRICT OUTPUT STRUCTURE:
+    ### ⚠️ {district} Environmental Warning
+    - Focus on {city} specific conditions (e.g. salinity, steepness, dust).
+    ### 💰 2026 Pricing (LKR)
+    - List repair estimates including 18% VAT and 2.5% SSCL.
+    - Justify costs using the 'Market-Linked Markup' method for imported parts.
+    ### 🛠️ Recommended Local Centers
+    - Suggest 2 centers near {city}.
     """
     try:
-        return llm.invoke(prompt).content
-    except Exception as e:
-        return f"Error: {str(e)}"
+        response = llm.invoke(prompt)
+        return response.content
+    except Exception as e: return f"Error: {e}"
 
-def process_chat_update(user_input, current_state):
-    # This function uses AI to "extract" updates from a chat message
-    llm = ChatGroq(model="llama-3.1-8b-instant", groq_api_key=st.secrets["GROQ_API_KEY"])
-    prompt = f"""
-    User says: "{user_input}"
-    Current vehicle data: {current_state}
-    If the user mentioned a new odometer, model, or maintenance update, return ONLY a JSON block with the updated fields. 
-    Otherwise, return "NO_UPDATE".
-    """
-    # Simplified for this demo: the AI handles the natural language extraction
-    return llm.invoke(prompt).content
+def analyze_photo_and_chat(image_file, user_query, vehicle_context):
+    vision_llm = get_llm("llama-3.2-11b-vision-preview")
+    image_data = base64.b64encode(image_file.read()).decode("utf-8")
+    
+    prompt = [
+        {"role": "user", "content": [
+            {"type": "text", "text": f"Context: {vehicle_context}. User Question: {user_query}. Analyze the image for errors/maintenance needs. Provide 2026 LKR costs (inc. 18% VAT)."},
+            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}}
+        ]}
+    ]
+    try:
+        return vision_llm.invoke(prompt).content
+    except Exception as e: return "I couldn't analyze the image. Please ensure it's clear."

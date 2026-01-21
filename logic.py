@@ -4,6 +4,12 @@ import base64
 import json
 from datetime import datetime
 import requests
+from io import BytesIO
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+from reportlab.lib import colors
 
 def get_weather_data(city):
     """Get current weather for the city"""
@@ -291,3 +297,139 @@ def generate_csv_report(report_data):
         csv_content += f"    Specialty: {shop.get('specialty', 'N/A')}\n"
     
     return csv_content
+
+def generate_pdf_report(report_data):
+    """Generate PDF export of the report"""
+    try:
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.5*inch, bottomMargin=0.5*inch)
+        story = []
+        styles = getSampleStyleSheet()
+        
+        # Title
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            textColor=colors.HexColor('#1f77b4'),
+            spaceAfter=12,
+            alignment=1
+        )
+        story.append(Paragraph("🔧 Vehicle Maintenance Report", title_style))
+        
+        # Metadata
+        meta = report_data['metadata']
+        meta_data = [
+            ['Vehicle:', f"{meta['vehicle']}"],
+            ['Location:', f"{meta['location']}"],
+            ['Odometer:', f"{meta['current_odometer']} km"],
+            ['Generated:', meta['generated_at'][:10]]
+        ]
+        meta_table = Table(meta_data, colWidths=[1.5*inch, 3.5*inch])
+        meta_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f0f0f0')),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        story.append(meta_table)
+        story.append(Spacer(1, 0.3*inch))
+        
+        # Risk Assessment
+        story.append(Paragraph("⚠️ Accident Risk Assessment", styles['Heading2']))
+        risk = report_data['accident_risk']
+        risk_data = [
+            ['Risk Level:', risk['level'], 'Score:', f"{risk['score']}/100"]
+        ]
+        risk_table = Table(risk_data, colWidths=[1.5*inch, 2*inch, 1*inch, 1*inch])
+        risk_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#fff3cd')),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        story.append(risk_table)
+        
+        # Risk Factors
+        story.append(Spacer(1, 0.2*inch))
+        story.append(Paragraph("Risk Factors:", styles['Heading3']))
+        for factor in risk['factors']:
+            story.append(Paragraph(f"• {factor}", styles['Normal']))
+        
+        story.append(Spacer(1, 0.3*inch))
+        
+        # Critical Issues
+        data = report_data['structured_data']
+        if data.get('critical_issues'):
+            story.append(Paragraph("🔴 Critical Issues", styles['Heading2']))
+            for issue in data['critical_issues']:
+                story.append(Paragraph(f"⚠️ {issue}", styles['Normal']))
+            story.append(Spacer(1, 0.2*inch))
+        
+        # Parts to Replace
+        if data.get('parts_to_replace'):
+            story.append(Paragraph("🔧 Parts to Replace", styles['Heading2']))
+            parts_data = [['Part', 'Urgency', 'Cost (LKR)', 'Reason']]
+            for part in data['parts_to_replace']:
+                parts_data.append([
+                    part.get('name', 'Unknown')[:20],
+                    part.get('urgency', 'N/A'),
+                    str(part.get('estimated_cost_lkr', 0)),
+                    part.get('why', 'N/A')[:30]
+                ])
+            
+            parts_table = Table(parts_data, colWidths=[1.5*inch, 1.2*inch, 1.2*inch, 1.6*inch])
+            parts_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#ff6b6b')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#ffe6e6')])
+            ]))
+            story.append(parts_table)
+            story.append(Spacer(1, 0.2*inch))
+        
+        # Next Service
+        service = data.get('next_service', {})
+        story.append(Paragraph("📅 Next Service Schedule", styles['Heading2']))
+        service_data = [
+            ['When:', service.get('when', 'N/A')],
+            ['Estimated Cost:', f"LKR {service.get('estimated_cost_lkr', 0):,}"],
+            ['Includes:', ', '.join(service.get('what_includes', []))]
+        ]
+        service_table = Table(service_data, colWidths=[2*inch, 3*inch])
+        service_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#e8f5e9')),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        story.append(service_table)
+        story.append(Spacer(1, 0.3*inch))
+        
+        # Maintenance Tips
+        if data.get('maintenance_tips'):
+            story.append(Paragraph("💡 Maintenance Tips", styles['Heading2']))
+            for tip in data['maintenance_tips'][:5]:  # Limit to 5 tips
+                story.append(Paragraph(f"✓ {tip}", styles['Normal']))
+            story.append(Spacer(1, 0.2*inch))
+        
+        # Build PDF
+        doc.build(story)
+        buffer.seek(0)
+        return buffer.getvalue()
+    except Exception as e:
+        st.error(f"PDF generation error: {str(e)}")
+        return None

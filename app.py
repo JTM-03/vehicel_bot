@@ -109,14 +109,29 @@ def display_formatted_report(report_data):
         
         st.divider()
         
-        # Download Button
-        csv_content = logic.generate_csv_report(report_data)
-        st.download_button(
-            label="📥 Download Report as CSV",
-            data=csv_content,
-            file_name=f"vehicle_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv"
-        )
+        # Download Buttons
+        col_csv, col_pdf = st.columns(2)
+        
+        with col_csv:
+            csv_content = logic.generate_csv_report(report_data)
+            st.download_button(
+                label="📊 Download as CSV",
+                data=csv_content,
+                file_name=f"vehicle_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        
+        with col_pdf:
+            pdf_content = logic.generate_pdf_report(report_data)
+            if pdf_content:
+                st.download_button(
+                    label="📄 Download as PDF",
+                    data=pdf_content,
+                    file_name=f"vehicle_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
     else:
         # Fallback for old format
         st.markdown(report_data)
@@ -357,59 +372,8 @@ with tab1:
         st.divider()
         submit = st.form_submit_button("🔍 Generate Predictive Report", use_container_width=True)
 
-    if submit:
-        if not model or not city or not district:
-            st.error("❌ Please enter vehicle model, city, and district")
-        else:
-            # Prepare vehicle data
-            vehicle_data = {
-                "v_type": v_type,
-                "model": model,
-                "district": district,
-                "city": city,
-                "odo": odo,
-                "m_year": m_year,
-                "s_odo": s_odo,
-                "a_odo": a_odo
-            }
-            
-            # Generate user ID from model + city (backend identification)
-            user_id = database.generate_user_id(model, city)
-            
-            # Store trip data
-            for trip in trips:
-                if trip["km"] > 0:  # Only store non-zero trips
-                    st.session_state.trips_data.append(trip)
-            
-            # Generate report with parts and notes
-            report = logic.get_advanced_report(
-                v_type, model, m_year, odo, district, city, 0, a_odo, s_odo, trips,
-                parts_replaced=parts_replaced if parts_replaced else None,
-                additional_notes=additional_notes if additional_notes else None
-            )
-            st.session_state.history_log.append({
-                "date": datetime.now().strftime("%Y-%m-%d %H:%M"), 
-                "model": model, 
-                "type": "Diagnostic", 
-                "content": report
-            })
-            
-            # Auto-save to database
-            database.save_user_data(
-                user_id,
-                vehicle_data,
-                st.session_state.trips_data,
-                st.session_state.history_log
-            )
-            
-            # Update session state
-            st.session_state.current_user_id = user_id
-            st.session_state.vehicle_data = vehicle_data
-            st.session_state.user_loaded = True
-            
-            st.success("✅ Diagnostic Report Generated & Data Saved!")
-            display_formatted_report(report)
-            st.balloons()
+
+    # Report generation is handled below with better validation
 
     if submit:
         if not model:
@@ -466,20 +430,47 @@ with tab1:
 with tab2:
     st.subheader("🤳 AI Photo Mechanic")
     st.info("📸 Upload a photo and ask the bot about errors or maintenance.")
-    photo = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"])
-    if photo:
-        st.image(photo, width=300)
-        query = st.chat_input("Ask a question about this photo...")
-        if query:
-            context = f"{st.session_state.vehicle_data.get('model', 'Vehicle')} in {st.session_state.vehicle_data.get('city', 'Location')}"
-            ans = logic.analyze_vision_chat(photo, query, context)
-            st.chat_message("assistant").write(ans)
-            st.session_state.history_log.append({
-                "date": datetime.now().strftime("%Y-%m-%d %H:%M"), 
-                "model": st.session_state.vehicle_data.get('model', 'Vehicle'), 
-                "type": "Photo Analysis", 
-                "content": ans
-            })
+    
+    col_photo, col_question = st.columns([1, 1])
+    
+    with col_photo:
+        st.write("**Upload Image**")
+        photo = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"], label_visibility="collapsed")
+    
+    with col_question:
+        st.write("**Your Question**")
+        query = st.text_input(
+            "Ask about the photo",
+            placeholder="e.g., Is this brake pad worn out? What maintenance is needed?",
+            label_visibility="collapsed"
+        )
+    
+    if photo and query:
+        st.image(photo, width=300, caption="Uploaded Image")
+        
+        with st.spinner("🔍 Analyzing image..."):
+            try:
+                context = f"{st.session_state.vehicle_data.get('model', 'Vehicle')} in {st.session_state.vehicle_data.get('city', 'Location')}"
+                ans = logic.analyze_vision_chat(photo, query, context)
+                
+                st.success("✅ Analysis Complete")
+                st.markdown(ans)
+                
+                st.session_state.history_log.append({
+                    "date": datetime.now().strftime("%Y-%m-%d %H:%M"), 
+                    "model": st.session_state.vehicle_data.get('model', 'Vehicle'), 
+                    "type": "Photo Analysis", 
+                    "content": ans
+                })
+                st.balloons()
+            except Exception as e:
+                st.error(f"❌ Analysis failed: {str(e)}")
+                st.info("💡 Tip: Make sure the image is clear and shows the vehicle part clearly.")
+    elif photo:
+        st.image(photo, width=300, caption="Uploaded Image")
+        st.info("👆 Please ask a question about the photo above")
+    else:
+        st.info("👆 Start by uploading a clear photo of your vehicle or the part you're concerned about")
 
 # --- TAB 3: TRIP DATA VISUALIZATION ---
 with tab3:

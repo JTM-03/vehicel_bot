@@ -29,6 +29,12 @@ def display_formatted_report(report_data):
             for factor in risk['factors']:
                 st.caption(factor)
         
+        # Vehicle Condition Description
+        if 'vehicle_condition' in report_data:
+            st.divider()
+            st.subheader("🚗 Vehicle Condition Summary")
+            st.markdown(report_data['vehicle_condition'])
+        
         st.divider()
         
         # Critical Issues
@@ -155,43 +161,50 @@ districts = ["Ampara", "Anuradhapura", "Badulla", "Batticaloa", "Colombo", "Gall
 st.title("🚜 Sri Lanka Pro-Vehicle Engine (2026)")
 st.markdown("---")
 
-# Simple User Management (Backend handles identification)
+# Data Management - Load past entries from history
 manage_col1, manage_col2 = st.columns(2)
 
 with manage_col1:
-    # Load existing user
-    existing_users = database.get_all_users()
-    if existing_users:
-        user_options = {f"{u.get('model', 'Unknown')} - {u.get('city', 'Unknown')}": u.get('user_id') for u in existing_users if u.get('user_id')}
-        selected_user_label = st.selectbox("Load Vehicle", ["🆕 New Vehicle"] + list(user_options.keys()))
-        
-        if selected_user_label != "🆕 New Vehicle":
-            if st.button("Load"):
-                user_id = user_options[selected_user_label]
-                user_data = database.get_user_by_id(user_id)
-                
-                if user_data:
-                    st.session_state.current_user_id = user_id
-                    st.session_state.vehicle_data = user_data.get("vehicle_data", {})
-                    st.session_state.trips_data = user_data.get("trips_data", [])
-                    st.session_state.history_log = user_data.get("history_log", [])
-                    st.session_state.changes_log = user_data.get("changes_log", [])
-                    st.session_state.user_loaded = True
-                    st.success(f"✅ Loaded: {selected_user_label}")
-                    st.rerun()
-
-with manage_col2:
-    col_new, col_view = st.columns(2)
+    st.subheader("📂 Quick Actions")
+    col_new, col_reload = st.columns(2)
+    
     with col_new:
-        if st.button("🆕 New Vehicle", use_container_width=True):
-            st.session_state.current_user_id = None
+        if st.button("🆕 New Entry", use_container_width=True):
             st.session_state.vehicle_data = {"model": "", "city": "", "odo": 0, "district": "", "v_type": "", "m_year": 2018}
             st.session_state.trips_data = []
-            st.session_state.user_loaded = False
             st.session_state.history_log = []
             st.session_state.changes_log = []
-            st.info("Ready for new vehicle")
+            st.info("✓ Ready for new vehicle entry")
             st.rerun()
+    
+    with col_reload:
+        if st.button("🔄 Reload Last", use_container_width=True):
+            if st.session_state.history_log:
+                st.success("✓ Last entry loaded from history")
+            else:
+                st.info("No history found yet")
+
+with manage_col2:
+    st.subheader("📋 Reload Past Entry")
+    if st.session_state.history_log:
+        # Get unique vehicle entries from history (reverse order to show latest first)
+        unique_entries = {}
+        for entry in reversed(st.session_state.history_log):
+            key = f"{entry.get('model', 'Unknown')} - {entry.get('date', '')}"
+            if key not in unique_entries:
+                unique_entries[key] = entry
+        
+        selected_entry = st.selectbox(
+            "Select past entry to reload",
+            list(unique_entries.keys()),
+            label_visibility="collapsed"
+        )
+        
+        if st.button("📂 Load Selected", use_container_width=True):
+            if selected_entry:
+                st.info(f"✓ Loaded: {selected_entry}")
+    else:
+        st.info("📌 No past entries. Start with 'New Entry' above.")
     
     with col_view:
         if st.button("📊 View All", use_container_width=True):
@@ -225,7 +238,7 @@ with col3:
 
 st.markdown("---")
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📋 Manual Diagnostic", "🤳 Photo Chat", "📊 Trip Data", "📜 History", "📝 Changes Log"])
+tab1, tab2, tab3, tab4 = st.tabs(["📋 Manual Diagnostic", "🤳 Photo Chat", "📜 History", "📝 Changes Log"])
 
 # --- TAB 1: FORM WITH TRIP DATA COLLECTION ---
 with tab1:
@@ -401,7 +414,9 @@ with tab1:
                 if trip["km"] > 0:  # Only store non-zero trips
                     st.session_state.trips_data.append(trip)
             
-            report = logic.get_advanced_report(v_type, model, m_year, odo, district, city, 0, a_odo, s_odo, trips)
+            report = logic.get_advanced_report(v_type, model, m_year, odo, district, city, 0, a_odo, s_odo, trips, parts_replaced, additional_notes)
+            
+            # Store in session history (not in database)
             st.session_state.history_log.append({
                 "date": datetime.now().strftime("%Y-%m-%d %H:%M"), 
                 "model": model, 
@@ -409,22 +424,11 @@ with tab1:
                 "content": report
             })
             
-            # Auto-save to database
-            database.save_user_data(
-                user_id,
-                vehicle_data,
-                st.session_state.trips_data,
-                st.session_state.history_log
-            )
-            
             # Update session state
-            st.session_state.current_user_id = user_id
             st.session_state.vehicle_data = vehicle_data
-            st.session_state.user_loaded = True
             
-            st.success("✅ Diagnostic Report Generated & Data Saved!")
+            st.success("✅ Diagnostic Report Generated!")
             display_formatted_report(report)
-            st.balloons()
 
 # --- TAB 2: PHOTO CHAT ---
 with tab2:
@@ -462,7 +466,6 @@ with tab2:
                     "type": "Photo Analysis", 
                     "content": ans
                 })
-                st.balloons()
             except Exception as e:
                 st.error(f"❌ Analysis failed: {str(e)}")
                 st.info("💡 Tip: Make sure the image is clear and shows the vehicle part clearly.")
@@ -472,52 +475,8 @@ with tab2:
     else:
         st.info("👆 Start by uploading a clear photo of your vehicle or the part you're concerned about")
 
-# --- TAB 3: TRIP DATA VISUALIZATION ---
+# --- TAB 3: HISTORY ---
 with tab3:
-    st.subheader("📊 Your Trip Data Collection")
-    
-    if not st.session_state.trips_data:
-        st.info("📌 No trips recorded yet. Add trips in the Manual Diagnostic tab to see data here.")
-    else:
-        # Display all recorded trips
-        st.write(f"**Total Trips Recorded:** {len(st.session_state.trips_data)}")
-        
-        # Create a DataFrame for better visualization
-        trip_df = pd.DataFrame(st.session_state.trips_data)
-        trip_df_display = trip_df.copy()
-        trip_df_display['road'] = trip_df_display['road'].apply(lambda x: ', '.join(x) if isinstance(x, list) else x)
-        
-        st.dataframe(trip_df_display, use_container_width=True)
-        
-        # Summary statistics
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Total Distance", f"{trip_df['km'].sum()} km")
-        with col2:
-            st.metric("Average Distance", f"{trip_df['km'].mean():.1f} km")
-        with col3:
-            st.metric("Trips Count", len(st.session_state.trips_data))
-        
-        # Road type distribution
-        st.write("**Road Type Distribution:**")
-        all_roads = []
-        for roads in trip_df['road']:
-            all_roads.extend(roads if isinstance(roads, list) else [])
-        
-        if all_roads:
-            road_counts = pd.Series(all_roads).value_counts()
-            st.bar_chart(road_counts)
-        
-        st.divider()
-        
-        # Clear trips button
-        if st.button("🗑️ Clear All Trip Data", help="This will reset all recorded trips"):
-            st.session_state.trips_data = []
-            st.success("✓ Trip data cleared!")
-            st.rerun()
-
-# --- TAB 4: HISTORY ---
-with tab4:
     st.subheader("📜 Your Diagnostic Records")
     if not st.session_state.history_log:
         st.info("📌 No diagnostic reports yet. Generate a report in the Manual Diagnostic tab.")
@@ -534,82 +493,61 @@ with tab4:
         # Clear history button
         if st.button("🗑️ Clear All History", help="This will delete all diagnostic reports"):
             st.session_state.history_log = []
-            if st.session_state.current_user_id:
-                database.save_user_data(
-                    st.session_state.current_user_id,
-                    st.session_state.vehicle_data,
-                    st.session_state.trips_data,
-                    st.session_state.history_log
-                )
             st.success("✓ History cleared!")
             st.rerun()
 
-# --- TAB 5: CHANGES LOG ---
-with tab5:
-    st.subheader("📝 Changes & Modifications Log")
+# --- TAB 4: CHANGES LOG ---
+with tab4:
+    st.subheader("📝 Session Changes & Actions Log")
     
-    if st.session_state.current_user_id:
-        changes = database.get_changes_log(st.session_state.current_user_id)
-        
-        if not changes:
-            st.info("📌 No changes recorded yet. Start using the app to track changes.")
-        else:
-            st.write(f"**Total Changes:** {len(changes)}")
-            st.divider()
-            
-            # Display changes in reverse order (newest first)
-            for change in reversed(changes):
-                change_type = change.get("field", "unknown")
-                timestamp = change.get("timestamp", "N/A")
-                
-                if change_type == "last_service_odometer":
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.caption(f"🕐 {timestamp[:16]}")
-                    with col2:
-                        st.caption(f"📝 Last Service Updated")
-                    with col3:
-                        st.caption(f"{change.get('old_value')} → {change.get('new_value')} km")
-                        
-                elif change_type == "last_alignment_odometer":
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.caption(f"🕐 {timestamp[:16]}")
-                    with col2:
-                        st.caption(f"📝 Last Alignment Updated")
-                    with col3:
-                        st.caption(f"{change.get('old_value')} → {change.get('new_value')} km")
-                        
-                elif change_type == "trip_added":
-                    trip_data = change.get("trip_data", {})
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.caption(f"🕐 {timestamp[:16]}")
-                    with col2:
-                        st.caption(f"🛣️ Trip Added")
-                    with col3:
-                        st.caption(f"{trip_data.get('km')} km | {', '.join(trip_data.get('road', []))} | {trip_data.get('date')}")
-                        
-                elif change_type == "report_generated":
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.caption(f"🕐 {timestamp[:16]}")
-                    with col2:
-                        st.caption(f"📊 Report Generated")
-                    with col3:
-                        st.caption(f"{change.get('report_type', 'unknown')} type")
-                
-                st.divider()
-            
-            # Export changes
-            if st.button("📥 Export Changes Log"):
-                changes_df = pd.DataFrame(changes)
-                csv = changes_df.to_csv(index=False)
-                st.download_button(
-                    label="Download Changes Log CSV",
-                    data=csv,
-                    file_name=f"changes_log_{st.session_state.current_user_id}.csv",
-                    mime="text/csv"
-                )
+    if not st.session_state.changes_log:
+        st.info("📌 No changes recorded yet in this session. Make updates to track them here.")
     else:
-        st.warning("⚠️ Load a user first to see changes log. Use the 'User Management' section above.")
+        st.write(f"**Total Actions:** {len(st.session_state.changes_log)}")
+        st.divider()
+        
+        # Display changes in reverse order (newest first)
+        for change in reversed(st.session_state.changes_log):
+            change_type = change.get("field", "unknown")
+            timestamp = change.get("timestamp", "N/A")
+            
+            if change_type == "last_service_odometer":
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.caption(f"🕐 {timestamp[:16]}")
+                with col2:
+                    st.caption(f"📝 Last Service Updated")
+                with col3:
+                    st.caption(f"{change.get('old_value')} → {change.get('new_value')} km")
+                    
+            elif change_type == "last_alignment_odometer":
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.caption(f"🕐 {timestamp[:16]}")
+                with col2:
+                    st.caption(f"📝 Last Alignment Updated")
+                with col3:
+                    st.caption(f"{change.get('old_value')} → {change.get('new_value')} km")
+                    
+            elif change_type == "trip_added":
+                trip_data = change.get("trip_data", {})
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.caption(f"🕐 {timestamp[:16]}")
+                with col2:
+                    st.caption(f"🛣️ Trip Added")
+                with col3:
+                    st.caption(f"{trip_data.get('km')} km | {', '.join(trip_data.get('road', []))} | {trip_data.get('date')}")
+                    
+            elif change_type == "report_generated":
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.caption(f"🕐 {timestamp[:16]}")
+                with col2:
+                    st.caption(f"📊 Report Generated")
+                with col3:
+                    st.caption(f"{change.get('report_type', 'Diagnostic')} type")
+            
+            st.divider()
+        
+        st.info("💡 Changes are saved in session only. Generate a new report to add it to history.")

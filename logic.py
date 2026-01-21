@@ -103,6 +103,56 @@ def calculate_accident_risk(vehicle_condition, weather, road_conditions, parts_r
         "factors": risk_factors
     }
 
+def get_vehicle_condition_description(odo, service_odo, align_odo, m_year, parts_replaced=None):
+    """Generate a human-readable description of vehicle condition"""
+    km_since_service = odo - service_odo
+    km_since_alignment = odo - align_odo
+    current_year = 2026
+    vehicle_age = current_year - m_year
+    
+    description = ""
+    
+    # Age assessment
+    if vehicle_age <= 3:
+        description += "🟢 **Vehicle Age:** Relatively new ("
+    elif vehicle_age <= 7:
+        description += "🟡 **Vehicle Age:** Mid-life ("
+    else:
+        description += "🔴 **Vehicle Age:** Aging vehicle ("
+    description += f"{vehicle_age} years old)\n"
+    
+    # Service status
+    if km_since_service < 5000:
+        description += "🟢 **Service Status:** Recently serviced (due in ~{} km)\n".format(8000 - km_since_service)
+    elif km_since_service < 8000:
+        description += "🟡 **Service Status:** Service due soon (~{} km remaining)\n".format(8000 - km_since_service)
+    else:
+        description += "🔴 **Service Status:** OVERDUE! ({} km since last service)\n".format(km_since_service)
+    
+    # Alignment status
+    if km_since_alignment < 5000:
+        description += "🟢 **Alignment:** Recently aligned\n"
+    elif km_since_alignment < 10000:
+        description += "🟡 **Alignment:** May need checking soon\n"
+    else:
+        description += "🔴 **Alignment:** Likely overdue ({} km since last alignment)\n".format(km_since_alignment)
+    
+    # Parts history
+    if parts_replaced:
+        description += f"✅ **Recent Maintenance:** {len(parts_replaced)} part(s) recently replaced\n"
+    else:
+        description += "⚠️ **Recent Maintenance:** No recent maintenance recorded\n"
+    
+    # Overall assessment
+    if km_since_service < 8000 and km_since_alignment < 10000 and vehicle_age <= 7:
+        description += "\n**Overall:** Vehicle in GOOD condition. Keep up regular maintenance."
+    elif km_since_service < 8000 and vehicle_age <= 10:
+        description += "\n**Overall:** Vehicle in FAIR condition. Schedule alignment and regular checks."
+    else:
+        description += "\n**Overall:** Vehicle needs ATTENTION. Schedule maintenance immediately."
+    
+    return description
+
 def get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, align_odo, service_odo, trips, parts_replaced=None, additional_notes=None):
     """Generate structured report with sections"""
     api_key = st.secrets.get("GROQ_API_KEY")
@@ -218,6 +268,9 @@ def get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, 
             "weather_advisories": []
         }
     
+    # Get vehicle condition description
+    vehicle_condition_desc = get_vehicle_condition_description(odo, service_odo, align_odo, m_year, parts_replaced)
+    
     return {
         "metadata": {
             "generated_at": datetime.now().isoformat(),
@@ -225,6 +278,7 @@ def get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, 
             "location": f"{city}, {district}",
             "current_odometer": odo
         },
+        "vehicle_condition": vehicle_condition_desc,
         "accident_risk": accident_risk,
         "weather": weather,
         "road_conditions": road_conditions,
@@ -236,19 +290,88 @@ def get_advanced_report(v_type, model, m_year, odo, district, city, tyre_odo, al
     return get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, align_odo, service_odo, trips, parts_replaced, additional_notes)
 
 def analyze_vision_chat(image_file, user_query, vehicle_context):
-    api_key = st.secrets.get("GROQ_API_KEY")
-    vision_llm = ChatGroq(model="llama-3.2-11b-vision-preview", groq_api_key=api_key)
-    image_data = base64.b64encode(image_file.read()).decode("utf-8")
-    
-    prompt = [
-        {"role": "user", "content": [
-            {"type": "text", "text": f"Context: {vehicle_context}. Query: {user_query}. Analyze image for maintenance/errors. Include 2026 LKR costs with 18% VAT and 2.5% SSCL."},
-            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}}
-        ]}
-    ]
+    """Analyze vehicle image using vision AI"""
     try:
-        return vision_llm.invoke(prompt).content
-    except Exception as e: return "Vision system error. Please ensure the image is clear."
+        import base64
+        import os
+        import tempfile
+        from groq import Groq
+        
+        api_key = st.secrets.get("GROQ_API_KEY")
+        if not api_key:
+            return "❌ API key not configured. Please set GROQ_API_KEY."
+        
+        # Read image file
+        image_data = image_file.read()
+        image_file.seek(0)
+        
+        # Detect image type
+        filename = image_file.name.lower()
+        if filename.endswith('.png'):
+            mime_type = "image/png"
+        elif filename.endswith(('.jpg', '.jpeg')):
+            mime_type = "image/jpeg"
+        else:
+            mime_type = "image/jpeg"
+        
+        # Encode to base64
+        image_base64 = base64.b64encode(image_data).decode("utf-8")
+        
+        # Create Groq client
+        client = Groq(api_key=api_key)
+        
+        # Prepare the message
+        message = client.chat.completions.create(
+            model="llama-3.2-11b-vision-preview",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"""You are an expert Sri Lankan automotive mechanic (2026).
+
+VEHICLE: {vehicle_context}
+USER'S QUESTION: {user_query}
+
+Analyze this vehicle image and provide:
+1. **What I see:** Clear identification of the part/component
+2. **Condition Assessment:** Good/Fair/Poor with details
+3. **Maintenance Needs:** Specific actions required
+4. **Cost Estimate:** In LKR (include 18% VAT + 2.5% SSCL)
+5. **Urgency:** Immediate/Soon/Preventive
+
+Be practical and specific."""
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{mime_type};base64,{image_base64}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            max_tokens=1024
+        )
+        
+        return message.choices[0].message.content
+        
+    except Exception as e:
+        error_msg = str(e)
+        if "vision" in error_msg.lower() or "image" in error_msg.lower():
+            return f"""⚠️ Image Analysis Error
+
+The image couldn't be processed. This can happen if:
+- Image is too small or blurry
+- Image format is unsupported
+- Image quality is very poor
+
+💡 Try uploading a clearer, well-lit photo of the vehicle part."""
+        elif "api" in error_msg.lower():
+            return "❌ API Connection Error: Check your GROQ API key and internet connection."
+        else:
+            return f"❌ Analysis Error: {error_msg[:100]}"
 
 def generate_csv_report(report_data):
     """Generate CSV export of the report"""

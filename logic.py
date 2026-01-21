@@ -9,25 +9,38 @@ def get_advanced_report(v_type, model, m_year, odo, district, city, tyre_odo, al
     # Financial context for 2026
     vat, sscl = "18%", "2.5%"
     
+    # Format trip data with dates
+    trips_summary = ""
+    for i, trip in enumerate(trips, 1):
+        date_str = trip.get("date", "Unknown date")
+        km = trip.get("km", 0)
+        roads = ', '.join(trip.get("road", [])) or "Not specified"
+        trips_summary += f"Trip {i} ({date_str}): {km}km on {roads} roads\n"
+    
     prompt = f"""
     Act as a Sri Lankan Automobile Engineer (2026).
     Vehicle: {m_year} {model} ({v_type}) in {city}, {district}.
     Odo: {odo}km. Last Service: {service_odo}km. Last Alignment: {align_odo}km.
     
-    RECENT TRIP DATA:
-    {trips}
+    RECENT TRIP DATA WITH DATES:
+    {trips_summary}
 
     STRICT OUTPUT FORMAT:
     ### ⚠️ {district} Road & Environment Warning
-    - Analyze the {trips} data against {city}'s terrain.
-    - Mention specific risks (e.g., if trips show 'Mountain' in {district}, check brake wear).
+    - Analyze the trip data against {city}'s terrain.
+    - Mention specific risks based on road types (e.g., if trips show 'Mountain', check brake wear).
+    - Consider frequency and timing of trips.
     
     ### 💰 2026 Costing & Justification (LKR)
     - Provide 2026 estimates including {vat} VAT and {sscl} SSCL.
     - Justification: Explain the 'Market-Linked Markup' method due to 2026 import tariffs (up to 30%).
+    - Base maintenance costs on trip patterns shown.
 
     ### 🛠️ Localized Service Centers
     - Suggest 2 reputable centers near {city}.
+    
+    ### 📅 Maintenance Timeline
+    - Based on the trip dates provided, recommend when next service/maintenance should occur.
     """
     try:
         return llm.invoke(prompt).content

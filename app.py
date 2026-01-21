@@ -63,7 +63,7 @@ with manage_col1:
     # Load existing user
     existing_users = database.get_all_users()
     if existing_users:
-        user_options = {f"{u['model']} - {u['city']}": u['user_id'] for u in existing_users}
+        user_options = {f"{u.get('model', 'Unknown')} - {u.get('city', 'Unknown')}": u.get('user_id') for u in existing_users if u.get('user_id')}
         selected_user_label = st.selectbox("📂 Load Existing User", ["🆕 New User"] + list(user_options.keys()))
         
         if selected_user_label != "🆕 New User":
@@ -135,10 +135,13 @@ with tab1:
         st.subheader("📍 Location & Profile")
         c1, c2, c3 = st.columns(3)
         with c1:
+            v_types = ["Petrol/Diesel Car", "Hybrid", "EV", "Motorbike", "Three-Wheeler"]
+            v_type_default = st.session_state.vehicle_data.get("v_type", "Petrol/Diesel Car")
+            v_type_index = v_types.index(v_type_default) if v_type_default in v_types else 0
             v_type = st.selectbox(
                 "Vehicle", 
-                ["Petrol/Diesel Car", "Hybrid", "EV", "Motorbike", "Three-Wheeler"],
-                index=["Petrol/Diesel Car", "Hybrid", "EV", "Motorbike", "Three-Wheeler"].index(st.session_state.vehicle_data.get("v_type", "Petrol/Diesel Car"))
+                v_types,
+                index=v_type_index
             )
             model = st.text_input(
                 "Model", 

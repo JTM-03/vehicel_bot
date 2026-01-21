@@ -7,11 +7,18 @@ import hashlib
 
 # This function safely finds your connection string no matter where the app is running
 def get_db_client():
+    mongo_uri = None
+    
     # 1. Try to get URI from Streamlit Cloud Secrets first
-    if "MONGO_URI" in st.secrets:
-        mongo_uri = st.secrets["MONGO_URI"]
-    else:
-        # 2. If not in Cloud, load from your local .env file
+    try:
+        if "MONGO_URI" in st.secrets:
+            mongo_uri = st.secrets["MONGO_URI"]
+    except:
+        # Secrets not configured - that's okay
+        pass
+    
+    # 2. If not in Cloud, load from your local .env file
+    if not mongo_uri:
         load_dotenv()
         mongo_uri = os.getenv("MONGO_URI")
 

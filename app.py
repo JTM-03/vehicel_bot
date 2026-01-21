@@ -37,13 +37,13 @@ with user_col1:
 
 with user_col2:
     if st.session_state.vehicle_data.get("model"):
-        st.success(f"🚗 {st.session_state.vehicle_data.get('v_type', 'Vehicle')}: {st.session_state.vehicle_data['model']}")
+        st.success(f"🚗 {st.session_state.vehicle_data.get('v_type', 'Vehicle')}: {st.session_state.vehicle_data.get('model', 'N/A')}")
     else:
         st.info("Enter vehicle model below")
 
 with user_col3:
     if st.session_state.vehicle_data.get("city"):
-        st.success(f"📍 {st.session_state.vehicle_data.get('district', 'District')}, {st.session_state.vehicle_data['city']}")
+        st.success(f"📍 {st.session_state.vehicle_data.get('district', 'District')}, {st.session_state.vehicle_data.get('city', 'N/A')}")
     else:
         st.info("Enter location below")
 

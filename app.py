@@ -205,20 +205,6 @@ with manage_col2:
                 st.info(f"✓ Loaded: {selected_entry}")
     else:
         st.info("📌 No past entries. Start with 'New Entry' above.")
-    
-    with col_view:
-        if st.button("📊 View All", use_container_width=True):
-            all_users = database.get_all_users()
-            if all_users:
-                st.write("**Registered Vehicles:**")
-                users_df = pd.DataFrame([{
-                    "Model": u.get('model', 'N/A'),
-                    "City": u.get('city', 'N/A'),
-                    "District": u.get('district', 'N/A')
-                } for u in all_users])
-                st.dataframe(users_df, use_container_width=True)
-            else:
-                st.info("No vehicles registered yet.")
 
 st.markdown("---")
 

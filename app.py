@@ -20,7 +20,7 @@ def display_formatted_report(report_data):
         st.markdown(f"**Vehicle:** {meta['vehicle']} | **Location:** {meta['location']} | **Odometer:** {meta['current_odometer']} km")
         st.divider()
         
-        # Accident Risk Section
+        # Accident Risk Section with detailed analysis
         st.subheader("⚠️ Accident Risk Assessment")
         col1, col2, col3 = st.columns([1, 2, 1])
         with col1:
@@ -28,6 +28,35 @@ def display_formatted_report(report_data):
         with col2:
             for factor in risk['factors']:
                 st.caption(factor)
+        
+        # Show detailed risk breakdown if available
+        if data.get('accident_risk_analysis'):
+            st.divider()
+            st.subheader("📊 Risk Breakdown Analysis")
+            analysis = data['accident_risk_analysis']
+            
+            # Show total risk
+            total_risk = analysis.get('total_estimated_risk', 0)
+            st.metric("Total Accident Risk", f"{total_risk}%")
+            
+            # Show component breakdown
+            col_a, col_b, col_c = st.columns(3)
+            with col_a:
+                st.metric("Base Risk", f"{analysis.get('base_risk', 0)}%")
+            with col_b:
+                parts_impact = sum([p.get('risk_increase', 0) for p in analysis.get('critical_parts_impact', [])])
+                st.metric("Critical Parts Impact", f"+{parts_impact}%")
+            with col_c:
+                service_impact = analysis.get('service_overdue_impact', 0)
+                st.metric("Service Overdue", f"+{service_impact}%")
+            
+            # Show which critical parts affect risk
+            if analysis.get('critical_parts_impact'):
+                st.write("**🔴 Parts Affecting Accident Risk:**")
+                for part in analysis['critical_parts_impact']:
+                    impact = part.get('risk_increase', 0)
+                    reason = part.get('reason', 'Impact on safety')
+                    st.warning(f"**{part.get('part')}** → +{impact}% risk ({reason})")
         
         # Vehicle Condition Description
         if 'vehicle_condition' in report_data:
@@ -47,7 +76,7 @@ def display_formatted_report(report_data):
         
         # Parts to Replace
         if data.get('parts_to_replace'):
-            st.subheader("🔧 Parts to Replace")
+            st.subheader("🔧 Parts to Replace (Impact on Accident Risk)")
             for part in data['parts_to_replace']:
                 urgency = part.get('urgency', 'MODERATE')
                 if urgency == 'CRITICAL':
@@ -57,27 +86,13 @@ def display_formatted_report(report_data):
                 else:
                     color = "🟡"
                 
+                risk_reduction = part.get('risk_reduction_if_replaced', 0)
                 with st.expander(f"{color} {part.get('name', 'Unknown')} - {part.get('estimated_cost_lkr', 0)} LKR"):
                     st.write(f"**Why:** {part.get('why', 'N/A')}")
                     st.write(f"**Urgency:** {urgency}")
                     st.write(f"**Estimated Cost:** LKR {part.get('estimated_cost_lkr', 0):,}")
-        
-        st.divider()
-        
-        # Next Service
-        service = data.get('next_service', {})
-        st.subheader("📅 Next Service Schedule")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("When", service.get('when', 'N/A'))
-        with col2:
-            st.metric("Cost", f"LKR {service.get('estimated_cost_lkr', 0):,}")
-        with col3:
-            st.metric("Includes", len(service.get('what_includes', [])))
-        
-        st.write("**Service Includes:**")
-        for item in service.get('what_includes', []):
-            st.write(f"  • {item}")
+                    if risk_reduction > 0:
+                        st.success(f"✅ Replacing this part will **reduce accident risk by {risk_reduction}%**")
         
         st.divider()
         

@@ -200,7 +200,7 @@ def get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, 
     
     # Get detailed recommendations from LLM
     prompt = f"""
-    Act as a Sri Lankan Professional Automobile Mechanic (2026).
+    Act as a Sri Lankan Professional Automobile Mechanic (2026) creating a COMPREHENSIVE RISK ASSESSMENT.
     
     VEHICLE DETAILS:
     - Model: {m_year} {model} ({v_type})
@@ -224,17 +224,34 @@ def get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, 
     
     ROAD CONDITIONS (from recent trips): {', '.join(road_conditions) if road_conditions else 'Unknown'}
     
-    Based on the vehicle condition, recent parts replaced, user-reported issues, weather, and road conditions, provide ONLY a structured JSON response (no markdown, no extra text) with these exact fields:
+    ⚠️ CRITICAL TASK: Analyze ALL vehicle information and identify which parts CRITICALLY affect accident risk percentage.
+    
+    ANALYZE:
+    1. How many critical parts (brakes, tires, steering, suspension) need replacement?
+    2. Each critical part missing/worn increases accident risk. Estimate the risk increase percentage.
+    3. Show which parts are SAFETY CRITICAL (brake failure = 40%+ risk increase, tire failure = 35%+ risk increase, steering = 30%+ risk, etc.)
+    4. Calculate total accident risk based on: Vehicle Age + Service Status + Critical Parts Needed + Weather + Road Conditions
+    5. If service is OVERDUE by significant km, that increases risk
+    6. If recent parts were REPLACED, that REDUCES risk for those components
+    
+    Provide ONLY a structured JSON response (no markdown, no extra text):
     {{
         "critical_issues": ["issue1", "issue2"],
-        "parts_to_replace": [
-            {{"name": "part name", "urgency": "CRITICAL/HIGH/MODERATE", "estimated_cost_lkr": 5000, "why": "reason"}},
-        ],
-        "next_service": {{
-            "when": "in X km / on DATE",
-            "estimated_cost_lkr": 15000,
-            "what_includes": ["service", "parts"]
+        "accident_risk_analysis": {{
+            "base_risk": 30,
+            "critical_parts_impact": [
+                {{"part": "Brake Pads", "risk_increase": 15, "reason": "Heavy wear detected, reduced braking efficiency increases accident risk"}},
+                {{"part": "Tires", "risk_increase": 12, "reason": "Tread wear high, grip compromised on wet roads"}}
+            ],
+            "service_overdue_impact": 10,
+            "weather_impact": 5,
+            "road_conditions_impact": 8,
+            "recently_replaced_reduction": -5,
+            "total_estimated_risk": 75
         }},
+        "parts_to_replace": [
+            {{"name": "part name", "urgency": "CRITICAL/HIGH/MODERATE", "estimated_cost_lkr": 5000, "why": "reason", "risk_reduction_if_replaced": 15}},
+        ],
         "spare_parts_shops": [
             {{"name": "Shop Name", "location": "City/Area", "phone": "0XX-XXXXXXX", "specialty": "type"}},
         ],
@@ -260,8 +277,12 @@ def get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, 
     except:
         structured_data = {
             "critical_issues": ["Unable to connect to AI service"],
+            "accident_risk_analysis": {
+                "base_risk": 0,
+                "critical_parts_impact": [],
+                "total_estimated_risk": 0
+            },
             "parts_to_replace": [],
-            "next_service": {"when": "Consult a mechanic", "estimated_cost_lkr": 0},
             "spare_parts_shops": [],
             "maintenance_tips": [],
             "road_specific_warnings": [],
@@ -301,9 +322,15 @@ def analyze_vision_chat(image_file, user_query, vehicle_context):
         if not api_key:
             return "❌ API key not configured. Please set GROQ_API_KEY."
         
-        # Read image file
+        # Read and prepare image
         image_data = image_file.read()
         image_file.seek(0)
+        
+        # Create Groq client
+        client = Groq(api_key=api_key)
+        
+        # Encode to base64
+        image_base64 = base64.b64encode(image_data).decode("utf-8")
         
         # Detect image type
         filename = image_file.name.lower()
@@ -314,13 +341,7 @@ def analyze_vision_chat(image_file, user_query, vehicle_context):
         else:
             mime_type = "image/jpeg"
         
-        # Encode to base64
-        image_base64 = base64.b64encode(image_data).decode("utf-8")
-        
-        # Create Groq client
-        client = Groq(api_key=api_key)
-        
-        # Prepare the message
+        # Prepare the message with proper structure for vision model
         message = client.chat.completions.create(
             model="llama-3.2-11b-vision-preview",
             messages=[
@@ -328,31 +349,33 @@ def analyze_vision_chat(image_file, user_query, vehicle_context):
                     "role": "user",
                     "content": [
                         {
-                            "type": "text",
-                            "text": f"""You are an expert Sri Lankan automotive mechanic (2026).
-
-VEHICLE: {vehicle_context}
-USER'S QUESTION: {user_query}
-
-Analyze this vehicle image and provide:
-1. **What I see:** Clear identification of the part/component
-2. **Condition Assessment:** Good/Fair/Poor with details
-3. **Maintenance Needs:** Specific actions required
-4. **Cost Estimate:** In LKR (include 18% VAT + 2.5% SSCL)
-5. **Urgency:** Immediate/Soon/Preventive
-
-Be practical and specific."""
-                        },
-                        {
                             "type": "image_url",
                             "image_url": {
                                 "url": f"data:{mime_type};base64,{image_base64}"
                             }
+                        },
+                        {
+                            "type": "text",
+                            "text": f"""You are an expert Sri Lankan automotive mechanic (2026). Analyze this vehicle photo.
+
+VEHICLE: {vehicle_context}
+QUESTION: {user_query}
+
+Provide analysis in this format:
+• **What I see:** [part/component identification]
+• **Condition:** [Good/Fair/Poor]
+• **Issues Found:** [specific problems if any]
+• **Maintenance Required:** [what needs to be done]
+• **Est. Cost (LKR):** [price with 18% VAT + 2.5% SSCL]
+• **Urgency:** [Immediate/Soon/Preventive/None]
+
+Be brief, practical, and specific."""
                         }
                     ]
                 }
             ],
-            max_tokens=1024
+            max_tokens=1024,
+            temperature=0.3
         )
         
         return message.choices[0].message.content

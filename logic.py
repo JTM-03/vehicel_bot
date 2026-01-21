@@ -579,3 +579,32 @@ def generate_pdf_report(report_data):
     except Exception as e:
         st.error(f"PDF generation error: {str(e)}")
         return None
+
+def chat_with_mechanic(user_query, vehicle_context):
+    """Chat with AI mechanic without image - text-only conversation"""
+    try:
+        api_key = st.secrets.get("GROQ_API_KEY")
+        if not api_key:
+            return "❌ API key not configured. Please set GROQ_API_KEY."
+        
+        llm = ChatGroq(model="llama-3.3-70b-versatile", groq_api_key=api_key)
+        
+        prompt = f"""You are a friendly and knowledgeable Sri Lankan automotive mechanic (2026).
+
+VEHICLE CONTEXT: {vehicle_context}
+USER QUESTION: {user_query}
+
+Provide practical, helpful advice about vehicle maintenance, repairs, or any automotive question.
+Be specific to Sri Lankan context where relevant (local costs, common issues, available services).
+Keep your response concise but thorough.
+If cost estimates are needed, include LKR pricing with 18% VAT and 2.5% SSCL where applicable."""
+        
+        response = llm.invoke(prompt).content
+        return response
+        
+    except Exception as e:
+        error_msg = str(e)
+        if "api" in error_msg.lower():
+            return "⚠️ Could not connect to AI service. Please check your internet connection."
+        else:
+            return f"⚠️ Error: {error_msg[:150]}"

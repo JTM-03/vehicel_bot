@@ -157,79 +157,27 @@ def display_formatted_report(report_data):
         # Fallback for old format
         st.markdown(report_data)
 
-# 1. Session State for Persistent History
-if "history_log" not in st.session_state: 
-    st.session_state.history_log = []
+# Session State for Form Data (Temporary - Not Stored)
 if "vehicle_data" not in st.session_state: 
     st.session_state.vehicle_data = {"model": "", "city": "", "odo": 0, "district": "", "v_type": "", "m_year": 2018}
 if "trips_data" not in st.session_state:
     st.session_state.trips_data = []
-if "current_user_id" not in st.session_state:
-    st.session_state.current_user_id = None
-if "user_loaded" not in st.session_state:
-    st.session_state.user_loaded = False
-if "changes_log" not in st.session_state:
-    st.session_state.changes_log = []
 
 districts = ["Ampara", "Anuradhapura", "Badulla", "Batticaloa", "Colombo", "Galle", "Gampaha", "Hambantota", "Jaffna", "Kalutara", "Kandy", "Kegalle", "Kilinochchi", "Kurunegala", "Mannar", "Matale", "Matara", "Moneragala", "Mullaitivu", "Nuwara Eliya", "Polonnaruwa", "Puttalam", "Ratnapura", "Trincomalee", "Vavuniya"]
 
 st.title("🚜 Sri Lanka Pro-Vehicle Engine (2026)")
 st.markdown("---")
-
-# Data Management - Load past entries from history
-manage_col1, manage_col2 = st.columns(2)
-
-with manage_col1:
-    st.subheader("📂 Quick Actions")
-    col_new, col_reload = st.columns(2)
-    
-    with col_new:
-        if st.button("🆕 New Entry", use_container_width=True):
-            st.session_state.vehicle_data = {"model": "", "city": "", "odo": 0, "district": "", "v_type": "", "m_year": 2018}
-            st.session_state.trips_data = []
-            st.session_state.history_log = []
-            st.session_state.changes_log = []
-            st.info("✓ Ready for new vehicle entry")
-            st.rerun()
-    
-    with col_reload:
-        if st.button("🔄 Reload Last", use_container_width=True):
-            if st.session_state.history_log:
-                st.success("✓ Last entry loaded from history")
-            else:
-                st.info("No history found yet")
-
-with manage_col2:
-    st.subheader("📋 Reload Past Entry")
-    if st.session_state.history_log:
-        # Get unique vehicle entries from history (reverse order to show latest first)
-        unique_entries = {}
-        for entry in reversed(st.session_state.history_log):
-            key = f"{entry.get('model', 'Unknown')} - {entry.get('date', '')}"
-            if key not in unique_entries:
-                unique_entries[key] = entry
-        
-        selected_entry = st.selectbox(
-            "Select past entry to reload",
-            list(unique_entries.keys()),
-            label_visibility="collapsed"
-        )
-        
-        if st.button("📂 Load Selected", use_container_width=True):
-            if selected_entry:
-                st.info(f"✓ Loaded: {selected_entry}")
-    else:
-        st.info("📌 No past entries. Start with 'New Entry' above.")
+st.info("📌 Enter vehicle data below and generate a diagnostic report. Data is analyzed but not stored.")
 
 st.markdown("---")
 
-# Display current trips status
+# Display trip input status
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.metric("Active Trips", len(st.session_state.trips_data), "trips tracked")
+    st.metric("Trip Inputs", len(st.session_state.trips_data), "trips added")
 with col2:
     total_km = sum([t.get("km", 0) for t in st.session_state.trips_data])
-    st.metric("Total Trip Distance", f"{total_km} km", "collected")
+    st.metric("Total Distance", f"{total_km} km", "entered")
 with col3:
     if st.session_state.trips_data:
         latest_date = max([t.get("date", "") for t in st.session_state.trips_data])
@@ -239,7 +187,7 @@ with col3:
 
 st.markdown("---")
 
-tab1, tab2, tab3, tab4 = st.tabs(["📋 Manual Diagnostic", "🤳 Photo Chat", "📜 History", "📝 Changes Log"])
+tab1, tab2 = st.tabs(["📋 Diagnostic & Report", "💬 AI Mechanic Chat"])
 
 # --- TAB 1: FORM WITH TRIP DATA COLLECTION ---
 with tab1:
@@ -351,7 +299,7 @@ with tab1:
         st.subheader("🔄 Recent Parts Replacements/Changes")
         st.info("📌 Tell us about any parts you've replaced or changed recently to improve our recommendations.")
         
-        parts_col1, parts_col2 = st.columns(2)
+        parts_col1, parts_col2, parts_col3 = st.columns(3)
         
         with parts_col1:
             parts_replaced = st.multiselect(
@@ -365,16 +313,30 @@ with tab1:
         
         with parts_col2:
             if parts_replaced:
-                parts_dates = {}
                 st.write("**When were they replaced?**")
+                parts_dates = {}
                 for part in parts_replaced:
                     parts_dates[part] = st.date_input(
-                        f"{part}",
+                        f"{part} - Date",
                         value=(datetime.now() - timedelta(days=30)).date(),
                         key=f"part_date_{part}"
                     )
             else:
                 parts_dates = {}
+        
+        with parts_col3:
+            if parts_replaced:
+                st.write("**At what mileage?**")
+                parts_mileage = {}
+                for part in parts_replaced:
+                    parts_mileage[part] = st.number_input(
+                        f"{part} - Mileage (km)",
+                        value=odo - 5000 if odo > 5000 else 0,
+                        min_value=0,
+                        key=f"part_mileage_{part}"
+                    )
+            else:
+                parts_mileage = {}
         
         # Additional notes
         additional_notes = st.text_area(
@@ -384,7 +346,17 @@ with tab1:
         )
 
         st.divider()
-        submit = st.form_submit_button("🔍 Generate Predictive Report", use_container_width=True)
+        col_submit, col_refresh = st.columns([3, 1])
+        
+        with col_submit:
+            submit = st.form_submit_button("🔍 Generate Predictive Report", use_container_width=True)
+        
+        with col_refresh:
+            refresh = st.form_submit_button("🔄 Refresh Form", use_container_width=True)
+            if refresh:
+                st.session_state.vehicle_data = {"model": "", "city": "", "odo": 0, "district": "", "v_type": "", "m_year": 2018}
+                st.session_state.trips_data = []
+                st.rerun()
 
 
     # Report generation is handled below with better validation
@@ -407,23 +379,12 @@ with tab1:
                 "a_odo": a_odo
             }
             
-            # Generate user ID from model + city (backend identification)
-            user_id = database.generate_user_id(model, city)
-            
-            # Store trip data
+            # Store trip data in session
             for trip in trips:
                 if trip["km"] > 0:  # Only store non-zero trips
                     st.session_state.trips_data.append(trip)
             
             report = logic.get_advanced_report(v_type, model, m_year, odo, district, city, 0, a_odo, s_odo, trips, parts_replaced, additional_notes)
-            
-            # Store in session history (not in database)
-            st.session_state.history_log.append({
-                "date": datetime.now().strftime("%Y-%m-%d %H:%M"), 
-                "model": model, 
-                "type": "Diagnostic", 
-                "content": report
-            })
             
             # Update session state
             st.session_state.vehicle_data = vehicle_data
@@ -431,124 +392,92 @@ with tab1:
             st.success("✅ Diagnostic Report Generated!")
             display_formatted_report(report)
 
-# --- TAB 2: PHOTO CHAT ---
+# --- TAB 2: AI MECHANIC CHATBOT ---
 with tab2:
-    st.subheader("🤳 AI Photo Mechanic")
-    st.info("📸 Upload a photo and ask the bot about errors or maintenance.")
+    st.subheader("💬 AI Mechanic Chatbot")
+    st.info("Chat with the AI mechanic for tips and advice. Optionally upload a photo for image analysis.")
     
-    col_photo, col_question = st.columns([1, 1])
+    # Initialize chat history for this session
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+    
+    # Display chat history
+    for message in st.session_state.chat_history:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+    
+    st.divider()
+    
+    # Input section
+    st.subheader("Your Input")
+    col_photo, col_input = st.columns([1, 2])
     
     with col_photo:
-        st.write("**Upload Image**")
-        photo = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"], label_visibility="collapsed")
+        st.write("**Optional: Upload Photo**")
+        photo = st.file_uploader(
+            "Upload vehicle image",
+            type=["jpg", "jpeg", "png"],
+            label_visibility="collapsed",
+            key="chat_photo"
+        )
+        if photo:
+            st.image(photo, width=200, caption="Uploaded photo")
     
-    with col_question:
-        st.write("**Your Question**")
-        query = st.text_input(
-            "Ask about the photo",
-            placeholder="e.g., Is this brake pad worn out? What maintenance is needed?",
+    with col_input:
+        st.write("**Your Question or Topic**")
+        user_query = st.text_input(
+            "Ask anything about your vehicle",
+            placeholder="e.g., 'My brakes feel spongy', 'How often should I change oil?', 'What maintenance do these tires need?'",
             label_visibility="collapsed"
         )
     
-    if photo and query:
-        st.image(photo, width=300, caption="Uploaded Image")
-        
-        with st.spinner("🔍 Analyzing image..."):
-            try:
-                context = f"{st.session_state.vehicle_data.get('model', 'Vehicle')} in {st.session_state.vehicle_data.get('city', 'Location')}"
-                ans = logic.analyze_vision_chat(photo, query, context)
-                
-                st.success("✅ Analysis Complete")
-                st.markdown(ans)
-                
-                st.session_state.history_log.append({
-                    "date": datetime.now().strftime("%Y-%m-%d %H:%M"), 
-                    "model": st.session_state.vehicle_data.get('model', 'Vehicle'), 
-                    "type": "Photo Analysis", 
-                    "content": ans
-                })
-            except Exception as e:
-                st.error(f"❌ Analysis failed: {str(e)}")
-                st.info("💡 Tip: Make sure the image is clear and shows the vehicle part clearly.")
-    elif photo:
-        st.image(photo, width=300, caption="Uploaded Image")
-        st.info("👆 Please ask a question about the photo above")
-    else:
-        st.info("👆 Start by uploading a clear photo of your vehicle or the part you're concerned about")
-
-# --- TAB 3: HISTORY ---
-with tab3:
-    st.subheader("📜 Your Diagnostic Records")
-    if not st.session_state.history_log:
-        st.info("📌 No diagnostic reports yet. Generate a report in the Manual Diagnostic tab.")
-    else:
-        st.write(f"**Total Records:** {len(st.session_state.history_log)}")
-        st.divider()
-        
-        for idx, entry in enumerate(reversed(st.session_state.history_log)):
-            with st.expander(f"🕒 {entry['date']} - {entry['model']} ({entry['type']})"):
-                st.markdown(entry['content'])
-        
-        st.divider()
-        
-        # Clear history button
-        if st.button("🗑️ Clear All History", help="This will delete all diagnostic reports"):
-            st.session_state.history_log = []
-            st.success("✓ History cleared!")
-            st.rerun()
-
-# --- TAB 4: CHANGES LOG ---
-with tab4:
-    st.subheader("📝 Session Changes & Actions Log")
+    # Chat submission
+    col_send, col_clear = st.columns([3, 1])
     
-    if not st.session_state.changes_log:
-        st.info("📌 No changes recorded yet in this session. Make updates to track them here.")
-    else:
-        st.write(f"**Total Actions:** {len(st.session_state.changes_log)}")
-        st.divider()
+    with col_send:
+        send_button = st.button("💬 Send Message", use_container_width=True)
+    
+    with col_clear:
+        if st.button("🔄 Clear Chat", use_container_width=True):
+            st.session_state.chat_history = []
+            st.rerun()
+    
+    # Process message
+    if send_button and user_query:
+        # Add user message to chat
+        st.session_state.chat_history.append({
+            "role": "user",
+            "content": user_query if not photo else f"{user_query}\n\n*[Photo uploaded]*"
+        })
         
-        # Display changes in reverse order (newest first)
-        for change in reversed(st.session_state.changes_log):
-            change_type = change.get("field", "unknown")
-            timestamp = change.get("timestamp", "N/A")
-            
-            if change_type == "last_service_odometer":
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.caption(f"🕐 {timestamp[:16]}")
-                with col2:
-                    st.caption(f"📝 Last Service Updated")
-                with col3:
-                    st.caption(f"{change.get('old_value')} → {change.get('new_value')} km")
-                    
-            elif change_type == "last_alignment_odometer":
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.caption(f"🕐 {timestamp[:16]}")
-                with col2:
-                    st.caption(f"📝 Last Alignment Updated")
-                with col3:
-                    st.caption(f"{change.get('old_value')} → {change.get('new_value')} km")
-                    
-            elif change_type == "trip_added":
-                trip_data = change.get("trip_data", {})
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.caption(f"🕐 {timestamp[:16]}")
-                with col2:
-                    st.caption(f"🛣️ Trip Added")
-                with col3:
-                    st.caption(f"{trip_data.get('km')} km | {', '.join(trip_data.get('road', []))} | {trip_data.get('date')}")
-                    
-            elif change_type == "report_generated":
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.caption(f"🕐 {timestamp[:16]}")
-                with col2:
-                    st.caption(f"📊 Report Generated")
-                with col3:
-                    st.caption(f"{change.get('report_type', 'Diagnostic')} type")
-            
-            st.divider()
-        
+        # Get AI response
+        with st.spinner("🤖 AI Mechanic is thinking..."):
+            try:
+                vehicle_context = f"{st.session_state.vehicle_data.get('model', 'Vehicle')} in {st.session_state.vehicle_data.get('city', 'Location')}"
+                
+                if photo:
+                    # Image analysis mode
+                    response = logic.analyze_vision_chat(photo, user_query, vehicle_context)
+                else:
+                    # Text-only chat mode
+                    response = logic.chat_with_mechanic(user_query, vehicle_context)
+                
+                # Add AI response to chat
+                st.session_state.chat_history.append({
+                    "role": "assistant",
+                    "content": response
+                })
+                
+                st.success("✅ Got response from AI Mechanic")
+                st.rerun()
+                
+            except Exception as e:
+                error_msg = f"❌ Error: {str(e)[:100]}"
+                st.session_state.chat_history.append({
+                    "role": "assistant",
+                    "content": error_msg
+                })
+                st.rerun()
+    elif send_button and not user_query:
+        st.warning("⚠️ Please enter a question or topic")
         st.info("💡 Changes are saved in session only. Generate a new report to add it to history.")

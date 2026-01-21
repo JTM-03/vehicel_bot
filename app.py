@@ -25,49 +25,18 @@ districts = ["Ampara", "Anuradhapura", "Badulla", "Batticaloa", "Colombo", "Gall
 st.title("🚜 Sri Lanka Pro-Vehicle Engine (2026)")
 st.markdown("---")
 
-# User Profile Section
-st.subheader("👤 User Profile & Identification")
-user_col1, user_col2, user_col3, user_col4 = st.columns(4)
-
-with user_col1:
-    if st.session_state.current_user_id:
-        st.info(f"🔑 User ID: `{st.session_state.current_user_id}`")
-    else:
-        st.warning("📭 No user loaded")
-
-with user_col2:
-    if st.session_state.vehicle_data.get("model"):
-        st.success(f"🚗 {st.session_state.vehicle_data.get('v_type', 'Vehicle')}: {st.session_state.vehicle_data.get('model', 'N/A')}")
-    else:
-        st.info("Enter vehicle model below")
-
-with user_col3:
-    if st.session_state.vehicle_data.get("city"):
-        st.success(f"📍 {st.session_state.vehicle_data.get('district', 'District')}, {st.session_state.vehicle_data.get('city', 'N/A')}")
-    else:
-        st.info("Enter location below")
-
-with user_col4:
-    if st.session_state.user_loaded:
-        st.success("✅ Data Loaded from Database")
-    else:
-        st.warning("🆕 New User Session")
-
-st.markdown("---")
-
-# User Management Section
-st.subheader("🔄 User Management")
-manage_col1, manage_col2, manage_col3 = st.columns(3)
+# Simple User Management (Backend handles identification)
+manage_col1, manage_col2 = st.columns(2)
 
 with manage_col1:
     # Load existing user
     existing_users = database.get_all_users()
     if existing_users:
         user_options = {f"{u.get('model', 'Unknown')} - {u.get('city', 'Unknown')}": u.get('user_id') for u in existing_users if u.get('user_id')}
-        selected_user_label = st.selectbox("📂 Load Existing User", ["🆕 New User"] + list(user_options.keys()))
+        selected_user_label = st.selectbox("Load Vehicle", ["🆕 New Vehicle"] + list(user_options.keys()))
         
-        if selected_user_label != "🆕 New User":
-            if st.button("⬇️ Load Selected User"):
+        if selected_user_label != "🆕 New Vehicle":
+            if st.button("Load"):
                 user_id = user_options[selected_user_label]
                 user_data = database.get_user_by_id(user_id)
                 
@@ -78,36 +47,35 @@ with manage_col1:
                     st.session_state.history_log = user_data.get("history_log", [])
                     st.session_state.changes_log = user_data.get("changes_log", [])
                     st.session_state.user_loaded = True
-                    st.success(f"✅ Loaded user: {selected_user_label}")
+                    st.success(f"✅ Loaded: {selected_user_label}")
                     st.rerun()
 
 with manage_col2:
-    # View all users
-    if st.button("📊 View All Users"):
-        all_users = database.get_all_users()
-        if all_users:
-            st.write("**Registered Users:**")
-            users_df = pd.DataFrame([{
-                "Model": u['model'],
-                "City": u['city'],
-                "District": u['district'],
-                "Created": u.get('created_date', 'N/A')[:10]
-            } for u in all_users])
-            st.dataframe(users_df, use_container_width=True)
-        else:
-            st.info("No users in database yet.")
-
-with manage_col3:
-    # Clear current session
-    if st.button("🗑️ Start New Session"):
-        st.session_state.current_user_id = None
-        st.session_state.vehicle_data = {"model": "", "city": "", "odo": 0, "district": "", "v_type": "", "m_year": 2018}
-        st.session_state.trips_data = []
-        st.session_state.user_loaded = False
-        st.session_state.history_log = []
-        st.session_state.changes_log = []
-        st.info("🆕 Session cleared. Ready for new user.")
-        st.rerun()
+    col_new, col_view = st.columns(2)
+    with col_new:
+        if st.button("🆕 New Vehicle", use_container_width=True):
+            st.session_state.current_user_id = None
+            st.session_state.vehicle_data = {"model": "", "city": "", "odo": 0, "district": "", "v_type": "", "m_year": 2018}
+            st.session_state.trips_data = []
+            st.session_state.user_loaded = False
+            st.session_state.history_log = []
+            st.session_state.changes_log = []
+            st.info("Ready for new vehicle")
+            st.rerun()
+    
+    with col_view:
+        if st.button("📊 View All", use_container_width=True):
+            all_users = database.get_all_users()
+            if all_users:
+                st.write("**Registered Vehicles:**")
+                users_df = pd.DataFrame([{
+                    "Model": u.get('model', 'N/A'),
+                    "City": u.get('city', 'N/A'),
+                    "District": u.get('district', 'N/A')
+                } for u in all_users])
+                st.dataframe(users_df, use_container_width=True)
+            else:
+                st.info("No vehicles registered yet.")
 
 st.markdown("---")
 
@@ -236,19 +204,12 @@ with tab1:
             ]
 
         st.divider()
-        col_submit1, col_submit2 = st.columns(2)
-        with col_submit1:
-            submit = st.form_submit_button("🔍 Generate Predictive Report")
-        with col_submit2:
-            save_profile = st.form_submit_button("💾 Save User Profile to Database")
+        submit = st.form_submit_button("🔍 Generate Predictive Report", use_container_width=True)
 
-    if save_profile:
+    if submit:
         if not model or not city or not district:
-            st.error("❌ Please enter vehicle model, city, and district to save profile")
+            st.error("❌ Please enter vehicle model, city, and district")
         else:
-            # Generate user ID
-            user_id = database.generate_user_id(model, city)
-            
             # Prepare vehicle data
             vehicle_data = {
                 "v_type": v_type,
@@ -261,23 +222,39 @@ with tab1:
                 "a_odo": a_odo
             }
             
-            # Save to database
-            success = database.save_user_data(
+            # Generate user ID from model + city (backend identification)
+            user_id = database.generate_user_id(model, city)
+            
+            # Store trip data
+            for trip in trips:
+                if trip["km"] > 0:  # Only store non-zero trips
+                    st.session_state.trips_data.append(trip)
+            
+            # Generate report
+            report = logic.get_advanced_report(v_type, model, m_year, odo, district, city, 0, a_odo, s_odo, trips)
+            st.session_state.history_log.append({
+                "date": datetime.now().strftime("%Y-%m-%d %H:%M"), 
+                "model": model, 
+                "type": "Diagnostic", 
+                "content": report
+            })
+            
+            # Auto-save to database
+            database.save_user_data(
                 user_id,
                 vehicle_data,
                 st.session_state.trips_data,
                 st.session_state.history_log
             )
             
-            if success:
-                st.session_state.current_user_id = user_id
-                st.session_state.vehicle_data = vehicle_data
-                st.session_state.user_loaded = True
-                st.success(f"✅ Profile saved! User ID: `{user_id}`")
-                st.info(f"Vehicle: {v_type} - {model} in {city}, {district}")
-                st.balloons()
-            else:
-                st.warning("⚠️ Database connection not available. Data saved in session only.")
+            # Update session state
+            st.session_state.current_user_id = user_id
+            st.session_state.vehicle_data = vehicle_data
+            st.session_state.user_loaded = True
+            
+            st.success("✅ Diagnostic Report Generated & Data Saved!")
+            st.markdown(report)
+            st.balloons()
 
     if submit:
         if not model:
@@ -285,8 +262,8 @@ with tab1:
         elif not any([t["km"] > 0 for t in trips]):
             st.error("❌ Please enter at least one trip distance")
         else:
-            # Update session state
-            st.session_state.vehicle_data = {
+            # Prepare vehicle data
+            vehicle_data = {
                 "v_type": v_type,
                 "model": model,
                 "district": district,
@@ -296,6 +273,9 @@ with tab1:
                 "s_odo": s_odo,
                 "a_odo": a_odo
             }
+            
+            # Generate user ID from model + city (backend identification)
+            user_id = database.generate_user_id(model, city)
             
             # Store trip data
             for trip in trips:
@@ -310,16 +290,20 @@ with tab1:
                 "content": report
             })
             
-            # Save to database if user is loaded
-            if st.session_state.current_user_id:
-                database.save_user_data(
-                    st.session_state.current_user_id,
-                    st.session_state.vehicle_data,
-                    st.session_state.trips_data,
-                    st.session_state.history_log
-                )
+            # Auto-save to database
+            database.save_user_data(
+                user_id,
+                vehicle_data,
+                st.session_state.trips_data,
+                st.session_state.history_log
+            )
             
-            st.success("✅ Diagnostic Report Generated!")
+            # Update session state
+            st.session_state.current_user_id = user_id
+            st.session_state.vehicle_data = vehicle_data
+            st.session_state.user_loaded = True
+            
+            st.success("✅ Diagnostic Report Generated & Data Saved!")
             st.markdown(report)
             st.balloons()
 

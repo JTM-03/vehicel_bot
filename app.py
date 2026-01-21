@@ -3,8 +3,123 @@ import logic
 import database
 from datetime import datetime, timedelta
 import pandas as pd
+import json
 
 st.set_page_config(page_title="SL AI Mechanic 2026", layout="wide")
+
+def display_formatted_report(report_data):
+    """Display a formatted and colored report"""
+    if isinstance(report_data, dict) and 'accident_risk' in report_data:
+        # New structured format
+        meta = report_data['metadata']
+        risk = report_data['accident_risk']
+        data = report_data['structured_data']
+        
+        # Title
+        st.title(f"🔧 Vehicle Maintenance Report")
+        st.markdown(f"**Vehicle:** {meta['vehicle']} | **Location:** {meta['location']} | **Odometer:** {meta['current_odometer']} km")
+        st.divider()
+        
+        # Accident Risk Section
+        st.subheader("⚠️ Accident Risk Assessment")
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col1:
+            st.metric("Risk Level", risk['level'], risk['score'])
+        with col2:
+            for factor in risk['factors']:
+                st.caption(factor)
+        
+        st.divider()
+        
+        # Critical Issues
+        if data.get('critical_issues'):
+            st.subheader("🔴 Critical Issues")
+            for issue in data['critical_issues']:
+                st.error(f"⚠️ {issue}")
+        
+        st.divider()
+        
+        # Parts to Replace
+        if data.get('parts_to_replace'):
+            st.subheader("🔧 Parts to Replace")
+            for part in data['parts_to_replace']:
+                urgency = part.get('urgency', 'MODERATE')
+                if urgency == 'CRITICAL':
+                    color = "🔴"
+                elif urgency == 'HIGH':
+                    color = "🟠"
+                else:
+                    color = "🟡"
+                
+                with st.expander(f"{color} {part.get('name', 'Unknown')} - {part.get('estimated_cost_lkr', 0)} LKR"):
+                    st.write(f"**Why:** {part.get('why', 'N/A')}")
+                    st.write(f"**Urgency:** {urgency}")
+                    st.write(f"**Estimated Cost:** LKR {part.get('estimated_cost_lkr', 0):,}")
+        
+        st.divider()
+        
+        # Next Service
+        service = data.get('next_service', {})
+        st.subheader("📅 Next Service Schedule")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("When", service.get('when', 'N/A'))
+        with col2:
+            st.metric("Cost", f"LKR {service.get('estimated_cost_lkr', 0):,}")
+        with col3:
+            st.metric("Includes", len(service.get('what_includes', [])))
+        
+        st.write("**Service Includes:**")
+        for item in service.get('what_includes', []):
+            st.write(f"  • {item}")
+        
+        st.divider()
+        
+        # Spare Parts Shops
+        if data.get('spare_parts_shops'):
+            st.subheader("🏪 Spare Parts Shops Near You")
+            for shop in data['spare_parts_shops']:
+                with st.expander(f"📍 {shop.get('name', 'Unknown')} - {shop.get('location', 'N/A')}"):
+                    st.write(f"**Phone:** {shop.get('phone', 'N/A')}")
+                    st.write(f"**Specialty:** {shop.get('specialty', 'N/A')}")
+        
+        st.divider()
+        
+        # Maintenance Tips
+        if data.get('maintenance_tips'):
+            st.subheader("💡 Maintenance Tips")
+            for tip in data['maintenance_tips']:
+                st.info(f"✓ {tip}")
+        
+        st.divider()
+        
+        # Road & Weather Warnings
+        col1, col2 = st.columns(2)
+        with col1:
+            if data.get('road_specific_warnings'):
+                st.subheader("🛣️ Road-Specific Warnings")
+                for warning in data['road_specific_warnings']:
+                    st.warning(f"⚠️ {warning}")
+        
+        with col2:
+            if data.get('weather_advisories'):
+                st.subheader("🌤️ Weather Advisories")
+                for advisory in data['weather_advisories']:
+                    st.warning(f"⚠️ {advisory}")
+        
+        st.divider()
+        
+        # Download Button
+        csv_content = logic.generate_csv_report(report_data)
+        st.download_button(
+            label="📥 Download Report as CSV",
+            data=csv_content,
+            file_name=f"vehicle_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv"
+        )
+    else:
+        # Fallback for old format
+        st.markdown(report_data)
 
 # 1. Session State for Persistent History
 if "history_log" not in st.session_state: 
@@ -204,6 +319,42 @@ with tab1:
             ]
 
         st.divider()
+        st.subheader("🔄 Recent Parts Replacements/Changes")
+        st.info("📌 Tell us about any parts you've replaced or changed recently to improve our recommendations.")
+        
+        parts_col1, parts_col2 = st.columns(2)
+        
+        with parts_col1:
+            parts_replaced = st.multiselect(
+                "Parts Recently Replaced/Changed",
+                ["Engine Oil", "Air Filter", "Cabin Filter", "Spark Plugs", "Battery", 
+                 "Brake Pads", "Brake Fluid", "Tyres", "Alignment", "Suspension", 
+                 "Exhaust", "Radiator Hose", "Water Pump", "Alternator", "Starter Motor",
+                 "Transmission Fluid", "Power Steering Fluid", "Clutch Plate", "Other"],
+                key="parts_replaced"
+            )
+        
+        with parts_col2:
+            if parts_replaced:
+                parts_dates = {}
+                st.write("**When were they replaced?**")
+                for part in parts_replaced:
+                    parts_dates[part] = st.date_input(
+                        f"{part}",
+                        value=(datetime.now() - timedelta(days=30)).date(),
+                        key=f"part_date_{part}"
+                    )
+            else:
+                parts_dates = {}
+        
+        # Additional notes
+        additional_notes = st.text_area(
+            "Additional Notes/Issues",
+            placeholder="e.g., 'Noticed grinding sound when braking', 'Engine light is on', 'Fuel efficiency decreased'",
+            key="additional_notes"
+        )
+
+        st.divider()
         submit = st.form_submit_button("🔍 Generate Predictive Report", use_container_width=True)
 
     if submit:
@@ -230,8 +381,12 @@ with tab1:
                 if trip["km"] > 0:  # Only store non-zero trips
                     st.session_state.trips_data.append(trip)
             
-            # Generate report
-            report = logic.get_advanced_report(v_type, model, m_year, odo, district, city, 0, a_odo, s_odo, trips)
+            # Generate report with parts and notes
+            report = logic.get_advanced_report(
+                v_type, model, m_year, odo, district, city, 0, a_odo, s_odo, trips,
+                parts_replaced=parts_replaced if parts_replaced else None,
+                additional_notes=additional_notes if additional_notes else None
+            )
             st.session_state.history_log.append({
                 "date": datetime.now().strftime("%Y-%m-%d %H:%M"), 
                 "model": model, 
@@ -253,7 +408,7 @@ with tab1:
             st.session_state.user_loaded = True
             
             st.success("✅ Diagnostic Report Generated & Data Saved!")
-            st.markdown(report)
+            display_formatted_report(report)
             st.balloons()
 
     if submit:
@@ -304,7 +459,7 @@ with tab1:
             st.session_state.user_loaded = True
             
             st.success("✅ Diagnostic Report Generated & Data Saved!")
-            st.markdown(report)
+            display_formatted_report(report)
             st.balloons()
 
 # --- TAB 2: PHOTO CHAT ---

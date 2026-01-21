@@ -1,11 +1,37 @@
-# 🚜 Vehicle Bot - Trip Data Tracking System
+# 🚜 Vehicle Bot - Trip Data Tracking & Multi-User System
 ## Sri Lanka Pro-Vehicle Engine (2026)
+
+**Version**: 1.1.0  
+**Status**: ✅ Production Ready  
+**Release Date**: January 21, 2026
 
 ---
 
-## 📋 What's New?
+## 🎉 What's New in v1.1.0?
 
-Your vehicle maintenance bot has been upgraded with a **professional three-trip data collection system** complete with **date tracking** and a **user-friendly interface**.
+### 🔐 User Identification System
+- Each user identified by **Vehicle Model + City**
+- Automatic unique User ID generation
+- No passwords or complex login required
+- Works across devices seamlessly
+
+### 💾 Data Persistence
+- All user data saved to **MongoDB**
+- Auto-loads on next visit
+- No data loss between sessions
+- Complete backup trail
+
+### 🔄 Multi-User Support
+- Switch between multiple vehicles
+- Load any user instantly
+- View all registered users
+- Easy user management
+
+### 📝 Change Tracking
+- Every modification logged
+- Service odometer updates tracked
+- Trip additions recorded
+- Export changes as CSV
 
 ### Key Features Added ✨
 - 📅 **Date Tracking** - Each trip now records when it occurred

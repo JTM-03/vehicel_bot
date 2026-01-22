@@ -257,14 +257,14 @@ if "additional_notes" not in st.session_state:
 
 districts = ["Ampara", "Anuradhapura", "Badulla", "Batticaloa", "Colombo", "Galle", "Gampaha", "Hambantota", "Jaffna", "Kalutara", "Kandy", "Kegalle", "Kilinochchi", "Kurunegala", "Mannar", "Matale", "Matara", "Moneragala", "Mullaitivu", "Nuwara Eliya", "Polonnaruwa", "Puttalam", "Ratnapura", "Trincomalee", "Vavuniya"]
 
-col1, col2, col3 = st.columns([1, 1, 1])
+col1, col2, col3 = st.columns([2, 1, 2])
 
 with col2:
-    st.image("logo.png", width=140)  # increased size
+    st.image("logo.png", width=150)
 
 st.markdown(
     """
-    <div style="text-align: center; padding: 5px 0;">
+    <div style="text-align: center; padding-top: 5px;">
         <h1 style="font-size: 46px; margin-bottom: 8px;">
             AutoSense AI
         </h1>
@@ -276,10 +276,6 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
-
-
-
 
 tab1, tab2 = st.tabs([" Diagnostic & Report", " AI Mechanic Chat"])
 

@@ -214,27 +214,17 @@ with tab1:
                 key="odo_input"
             )
         
-        # Fuel Type - Dynamic based on vehicle type
-        st.subheader("⛽ Fuel Type")
+        # Auto-detect fuel type from vehicle type (no user input needed)
         if v_type == "EV":
-            st.info("⚡ This vehicle uses electricity - no fuel type selection needed")
             fuel_type = "Electric"
         elif v_type == "Hybrid":
-            st.info("🔄 Hybrid vehicles use both engine and battery")
             fuel_type = "Hybrid"
         elif v_type == "Motorbike":
-            st.info("🏍️ Motorbikes typically use petrol")
             fuel_type = "Petrol"
         elif v_type == "Three-Wheeler":
-            fuel_types = ["Petrol", "Diesel"]
-            fuel_type_default = st.session_state.vehicle_data.get("fuel_type", "Petrol")
-            fuel_type_index = fuel_types.index(fuel_type_default) if fuel_type_default in fuel_types else 0
-            fuel_type = st.selectbox("Fuel Type", fuel_types, index=fuel_type_index, key="fuel_type_tuk")
+            fuel_type = "Petrol"  # Default for tuks
         else:  # Petrol/Diesel Car
-            fuel_types = ["Petrol", "Diesel"]
-            fuel_type_default = st.session_state.vehicle_data.get("fuel_type", "Petrol")
-            fuel_type_index = fuel_types.index(fuel_type_default) if fuel_type_default in fuel_types else 0
-            fuel_type = st.selectbox("Fuel Type", fuel_types, index=fuel_type_index, key="fuel_type_car")
+            fuel_type = "Petrol"  # Default for cars
         
         st.divider()
         st.subheader("📍 Location")

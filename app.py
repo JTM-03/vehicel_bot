@@ -166,8 +166,6 @@ if "three_recent_trips" not in st.session_state:
     st.session_state.three_recent_trips = [{"date": datetime.now().date(), "km": 0, "road": []}]*3
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
-if "chat_photo" not in st.session_state:
-    st.session_state.chat_photo = None
 if "parts_replaced" not in st.session_state:
     st.session_state.parts_replaced = []
 if "parts_dates" not in st.session_state:
@@ -505,7 +503,6 @@ with tab2:
     # Handle clear chat first (before processing messages)
     if clear_button:
         st.session_state.chat_history = []
-        st.session_state.chat_photo = None
         st.rerun()
     
     # Process message

@@ -605,9 +605,13 @@ with tab2:
             try:
                 vehicle_context = f"{st.session_state.vehicle_data.get('model', 'Vehicle')} in {st.session_state.vehicle_data.get('city', 'Location')}"
                 
-                # Check if photo was uploaded in the expander (you may need to modify this based on your logic)
-                # For now, using text-only chat mode
-                response = logic.chat_with_mechanic(user_query, vehicle_context)
+                # Check if a photo is currently uploaded
+                if photo:
+                    # Photo analysis mode - analyze the image and provide report
+                    response = logic.analyze_vision_chat(photo, user_query, vehicle_context)
+                else:
+                    # Text-only chat mode
+                    response = logic.chat_with_mechanic(user_query, vehicle_context)
                 
                 # Add AI response to chat
                 st.session_state.chat_history.append({

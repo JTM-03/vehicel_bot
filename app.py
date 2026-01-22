@@ -171,22 +171,6 @@ st.info("📌 Enter vehicle data below and generate a diagnostic report. Data is
 
 st.markdown("---")
 
-# Display trip input status
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.metric("Trip Inputs", len(st.session_state.trips_data), "trips added")
-with col2:
-    total_km = sum([t.get("km", 0) for t in st.session_state.trips_data])
-    st.metric("Total Distance", f"{total_km} km", "entered")
-with col3:
-    if st.session_state.trips_data:
-        latest_date = max([t.get("date", "") for t in st.session_state.trips_data])
-        st.metric("Latest Trip", latest_date, "recorded")
-    else:
-        st.metric("Latest Trip", "None", "recorded")
-
-st.markdown("---")
-
 tab1, tab2 = st.tabs(["📋 Diagnostic & Report", "💬 AI Mechanic Chat"])
 
 # --- TAB 1: FORM WITH TRIP DATA COLLECTION ---

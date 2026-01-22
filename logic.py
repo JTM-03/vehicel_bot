@@ -10,6 +10,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib import colors
+from datasets import dataset_handler
 
 def get_weather_data(city):
     """Get current weather for the city"""
@@ -29,6 +30,47 @@ def get_weather_data(city):
     except:
         pass
     return None
+
+def get_spare_parts_shops(city, district):
+    """Get nearby spare parts shops for the location"""
+    # Mock shop data for major Sri Lankan cities
+    shops_data = {
+        "colombo": [
+            {"name": "AutoParts Central", "location": "Colombo 5", "phone": "011-2508888", "specialty": "All Vehicle Parts"},
+            {"name": "Premium Auto Supplies", "location": "Colombo 4", "phone": "011-2487777", "specialty": "Engine & Transmission"},
+            {"name": "Genuine Parts House", "location": "Colombo 6", "phone": "011-2580000", "specialty": "Original Manufacturer Parts"},
+        ],
+        "kandy": [
+            {"name": "Kandy Auto Parts", "location": "Kandy Central", "phone": "081-2234567", "specialty": "All Vehicle Types"},
+            {"name": "Hill Country Motors", "location": "Peradeniya", "phone": "081-2390000", "specialty": "Brakes & Suspension"},
+        ],
+        "galle": [
+            {"name": "South Coast Auto", "location": "Galle Main Road", "phone": "091-2245678", "specialty": "All Spare Parts"},
+            {"name": "Galle Genuine Parts", "location": "Galle Fort Area", "phone": "091-2240000", "specialty": "Quality Assurance"},
+        ],
+        "matara": [
+            {"name": "Matara Auto Supplies", "location": "Main Street", "phone": "041-2225555", "specialty": "All Parts"},
+        ],
+        "jaffna": [
+            {"name": "Jaffna Auto Center", "location": "Market Road", "phone": "021-2225555", "specialty": "All Vehicle Parts"},
+        ],
+        "negombo": [
+            {"name": "Coastal Auto Parts", "location": "Main Road", "phone": "031-2226666", "specialty": "All Vehicle Types"},
+        ]
+    }
+    
+    # Find shops based on city (case-insensitive)
+    city_lower = city.lower().strip()
+    shops = shops_data.get(city_lower, [])
+    
+    # If no specific city match, return generic shops
+    if not shops:
+        shops = [
+            {"name": f"{city} Auto Parts", "location": city, "phone": "Local Contact", "specialty": "All Vehicle Parts"},
+            {"name": f"{district} Motors", "location": district, "phone": "Local Contact", "specialty": "Professional Service"},
+        ]
+    
+    return shops
 
 def calculate_accident_risk(vehicle_condition, weather, road_conditions, parts_replaced=None):
     """Calculate accident risk based on multiple factors"""
@@ -154,7 +196,7 @@ def get_vehicle_condition_description(odo, service_odo, align_odo, m_year, parts
     return description
 
 def get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, align_odo, service_odo, trips, parts_replaced=None, additional_notes=None):
-    """Generate structured report with sections"""
+    """Generate structured report with sections - Using datasets for maintenance, APIs for weather/shops"""
     api_key = st.secrets.get("GROQ_API_KEY")
     llm = ChatGroq(model="llama-3.3-70b-versatile", groq_api_key=api_key)
     
@@ -198,50 +240,56 @@ def get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, 
         for part in parts_replaced:
             parts_info += f"  - {part}\n"
     
-    # Get detailed recommendations from LLM
+    # GET MAINTENANCE RECOMMENDATIONS FROM DATASET
+    maintenance_recommendations = dataset_handler.get_maintenance_recommendations(
+        v_type, odo, service_odo
+    )
+    
+    # Convert dataset recommendations to JSON format
+    parts_to_replace = []
+    for rec in maintenance_recommendations:
+        parts_to_replace.append({
+            "name": rec.get("name", "Unknown Part"),
+            "urgency": rec.get("urgency", "MODERATE"),
+            "estimated_cost_lkr": rec.get("estimated_cost_lkr", 0),
+            "why": rec.get("why", "Maintenance interval reached"),
+            "risk_reduction_if_replaced": rec.get("risk_reduction_if_replaced", 5)
+        })
+    
+    # Get shops using API
+    spare_parts_shops = get_spare_parts_shops(city, district)
+    
+    # Use AI for risk analysis, maintenance tips, and advisories only
     prompt = f"""
-    Act as a Sri Lankan Professional Automobile Mechanic (2026) creating a COMPREHENSIVE RISK ASSESSMENT.
+    Act as a Sri Lankan Professional Automobile Mechanic (2026) analyzing vehicle risk.
     
     VEHICLE DETAILS:
     - Model: {m_year} {model} ({v_type})
     - Current Odometer: {odo}km
     - Last Service: {service_odo}km (km since service: {km_since_service}km)
-    - Last Alignment: {align_odo}km (km since alignment: {km_since_alignment}km)
     - Location: {city}, {district}
+    
+    MAINTENANCE NEEDS (from specialist database):
+    {json.dumps(parts_to_replace, indent=2) if parts_to_replace else "No parts due for replacement"}
     
     RECENT TRIPS:
     {trips_summary}
     
-    {parts_info}
-    
     USER REPORTED ISSUES:
     {additional_notes if additional_notes else 'No issues reported'}
     
-    WEATHER (Today):
-    - Temperature: {weather['temp'] if weather else 'N/A'}°C
-    - Condition: {weather['condition'] if weather else 'N/A'}
-    - Humidity: {weather['humidity'] if weather else 'N/A'}%
+    WEATHER (Today): {weather['condition'] if weather else 'N/A'} - {weather['temp'] if weather else 'N/A'}°C
+    ROAD CONDITIONS: {', '.join(road_conditions) if road_conditions else 'Unknown'}
     
-    ROAD CONDITIONS (from recent trips): {', '.join(road_conditions) if road_conditions else 'Unknown'}
+    TASK: Provide ONLY risk analysis insights and safety advisories. Maintenance needs are already determined from database.
     
-    ⚠️ CRITICAL TASK: Analyze ALL vehicle information and identify which parts CRITICALLY affect accident risk percentage.
-    
-    ANALYZE:
-    1. How many critical parts (brakes, tires, steering, suspension) need replacement?
-    2. Each critical part missing/worn increases accident risk. Estimate the risk increase percentage.
-    3. Show which parts are SAFETY CRITICAL (brake failure = 40%+ risk increase, tire failure = 35%+ risk increase, steering = 30%+ risk, etc.)
-    4. Calculate total accident risk based on: Vehicle Age + Service Status + Critical Parts Needed + Weather + Road Conditions
-    5. If service is OVERDUE by significant km, that increases risk
-    6. If recent parts were REPLACED, that REDUCES risk for those components
-    
-    Provide ONLY a structured JSON response (no markdown, no extra text):
+    Respond ONLY with valid JSON (no markdown, no extra text):
     {{
         "critical_issues": ["issue1", "issue2"],
         "accident_risk_analysis": {{
             "base_risk": 30,
             "critical_parts_impact": [
-                {{"part": "Brake Pads", "risk_increase": 15, "reason": "Heavy wear detected, reduced braking efficiency increases accident risk"}},
-                {{"part": "Tires", "risk_increase": 12, "reason": "Tread wear high, grip compromised on wet roads"}}
+                {{"part": "Brake Pads", "risk_increase": 15, "reason": "part details"}},
             ],
             "service_overdue_impact": 10,
             "weather_impact": 5,
@@ -249,13 +297,7 @@ def get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, 
             "recently_replaced_reduction": -5,
             "total_estimated_risk": 75
         }},
-        "parts_to_replace": [
-            {{"name": "part name", "urgency": "CRITICAL/HIGH/MODERATE", "estimated_cost_lkr": 5000, "why": "reason", "risk_reduction_if_replaced": 15}},
-        ],
-        "spare_parts_shops": [
-            {{"name": "Shop Name", "location": "City/Area", "phone": "0XX-XXXXXXX", "specialty": "type"}},
-        ],
-        "maintenance_tips": ["tip1", "tip2"],
+        "maintenance_tips": ["tip1", "tip2", "tip3"],
         "road_specific_warnings": ["warning1"],
         "weather_advisories": ["advisory1"]
     }}
@@ -273,21 +315,30 @@ def get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, 
             response = response[:-3]
         response = response.strip()
         
-        structured_data = json.loads(response)
-    except:
-        structured_data = {
-            "critical_issues": ["Unable to connect to AI service"],
+        ai_analysis = json.loads(response)
+    except Exception as e:
+        ai_analysis = {
+            "critical_issues": [],
             "accident_risk_analysis": {
                 "base_risk": 0,
                 "critical_parts_impact": [],
                 "total_estimated_risk": 0
             },
-            "parts_to_replace": [],
-            "spare_parts_shops": [],
-            "maintenance_tips": [],
+            "maintenance_tips": ["Consult with a professional mechanic"],
             "road_specific_warnings": [],
             "weather_advisories": []
         }
+    
+    # Merge dataset maintenance with AI risk analysis
+    structured_data = {
+        "critical_issues": ai_analysis.get("critical_issues", []),
+        "accident_risk_analysis": ai_analysis.get("accident_risk_analysis", {}),
+        "parts_to_replace": parts_to_replace,
+        "spare_parts_shops": spare_parts_shops,
+        "maintenance_tips": ai_analysis.get("maintenance_tips", []),
+        "road_specific_warnings": ai_analysis.get("road_specific_warnings", []),
+        "weather_advisories": ai_analysis.get("weather_advisories", [])
+    }
     
     # Get vehicle condition description
     vehicle_condition_desc = get_vehicle_condition_description(odo, service_odo, align_odo, m_year, parts_replaced)

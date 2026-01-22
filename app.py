@@ -257,31 +257,22 @@ if "additional_notes" not in st.session_state:
 
 districts = ["Ampara", "Anuradhapura", "Badulla", "Batticaloa", "Colombo", "Galle", "Gampaha", "Hambantota", "Jaffna", "Kalutara", "Kandy", "Kegalle", "Kilinochchi", "Kurunegala", "Mannar", "Matale", "Matara", "Moneragala", "Mullaitivu", "Nuwara Eliya", "Polonnaruwa", "Puttalam", "Ratnapura", "Trincomalee", "Vavuniya"]
 
-st.image("logo.jpeg", width=90)
-
 st.markdown(
     """
-    <div style="text-align: center; padding: 10px 0;">
+    <div style="text-align: center;">
+        <img src="logo.jpeg" width="90" style="margin-bottom: 10px;">
         <h1 style="font-size: 46px; margin-bottom: 8px;">
             AutoSense AI
         </h1>
         <h3 style="font-weight: 500; letter-spacing: 2px; color: #4f8bf9;">
             Predict | Prevent | Protect
         </h3>
+        <hr style="margin-top: 15px;">
     </div>
-    <hr style="margin-top: 15px;">
     """,
     unsafe_allow_html=True
 )
 
-st.markdown(
-    """
-    <div style="text-align: center;">
-        <img src="logo.jpeg" width="90">
-    </div>
-    """,
-    unsafe_allow_html=True
-)
 
 
 tab1, tab2 = st.tabs([" Diagnostic & Report", " AI Mechanic Chat"])

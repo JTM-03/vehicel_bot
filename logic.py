@@ -334,7 +334,7 @@ def get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, 
     {additional_notes if additional_notes else 'No issues reported'}
     
     ENVIRONMENTAL FACTORS:
-    - WEATHER (Today): {weather['condition'] if weather else 'N/A'} - {weather['temp'] if weather else 'N/A'}°C (Humidity: {weather.get('humidity', 'N/A')}%)
+    - WEATHER (Today): {weather['condition'] if weather else 'N/A'} - {weather['temp'] if weather else 'N/A'}°C {f"(Humidity: {weather.get('humidity', 'N/A')}%)" if weather else ''}
     - ROAD CONDITIONS: {', '.join(road_conditions) if road_conditions else 'Unknown/Mixed'}
     - DISTRICT: {district} (affects available services and road types)
     

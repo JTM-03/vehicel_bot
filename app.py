@@ -173,85 +173,132 @@ tab1, tab2 = st.tabs(["📋 Diagnostic & Report", "💬 AI Mechanic Chat"])
 # --- TAB 1: FORM WITH TRIP DATA COLLECTION ---
 with tab1:
     with st.form("main_form"):
-        st.subheader("📍 Location & Profile")
-        c1, c2, c3 = st.columns(3)
+        st.subheader("� Step 1: Vehicle Information")
+        st.info("👇 First, tell us about your vehicle")
+        
+        c1, c2, c3, c4 = st.columns(4)
         with c1:
             v_types = ["Petrol/Diesel Car", "Hybrid", "EV", "Motorbike", "Three-Wheeler"]
             v_type_default = st.session_state.vehicle_data.get("v_type", "Petrol/Diesel Car")
             v_type_index = v_types.index(v_type_default) if v_type_default in v_types else 0
             v_type = st.selectbox(
-                "Vehicle", 
+                "Vehicle Type", 
                 v_types,
-                index=v_type_index
+                index=v_type_index,
+                key="v_type_select"
             )
-            model = st.text_input(
-                "Model", 
-                placeholder="e.g. Pulsar 150 / Wagon R",
-                value=st.session_state.vehicle_data.get("model", "")
-            )
+        
         with c2:
-            # Determine available fuel types based on vehicle type
-            if v_type == "EV":
-                fuel_types = ["Electric"]
-            elif v_type == "Hybrid":
-                fuel_types = ["Hybrid"]
-            elif v_type == "Motorbike":
-                fuel_types = ["Petrol"]
-            elif v_type == "Three-Wheeler":
-                fuel_types = ["Petrol", "Diesel"]
-            else:  # Petrol/Diesel Car
-                fuel_types = ["Petrol", "Diesel"]
-            
-            fuel_type_default = st.session_state.vehicle_data.get("fuel_type", fuel_types[0])
-            fuel_type_index = fuel_types.index(fuel_type_default) if fuel_type_default in fuel_types else 0
-            fuel_type = st.selectbox(
-                "Fuel Type",
-                fuel_types,
-                index=fuel_type_index
+            model = st.text_input(
+                "Brand/Model", 
+                placeholder="e.g. Honda Civic",
+                value=st.session_state.vehicle_data.get("model", ""),
+                key="model_input"
             )
-            
-            district = st.selectbox(
-                "District", 
-                sorted(districts),
-                index=sorted(districts).index(st.session_state.vehicle_data.get("district", "Colombo")) if st.session_state.vehicle_data.get("district") in districts else 0
-            )
-            city = st.text_input(
-                "Nearest City", 
-                placeholder="e.g. Maharagama",
-                value=st.session_state.vehicle_data.get("city", "")
-            )
+        
         with c3:
-            odo = st.number_input(
-                "Odometer (km)", 
-                min_value=0, 
-                step=500,
-                value=int(st.session_state.vehicle_data.get("odo", 0))
-            )
             m_year = st.number_input(
                 "Year", 
                 1990, 
                 2026, 
-                int(st.session_state.vehicle_data.get("m_year", 2018))
+                int(st.session_state.vehicle_data.get("m_year", 2018)),
+                key="year_input"
             )
-
+        
+        with c4:
+            odo = st.number_input(
+                "Odometer (km)", 
+                min_value=0, 
+                step=500,
+                value=int(st.session_state.vehicle_data.get("odo", 0)),
+                key="odo_input"
+            )
+        
+        # Fuel Type - Dynamic based on vehicle type
+        st.subheader("⛽ Fuel Type")
+        if v_type == "EV":
+            st.info("⚡ This vehicle uses electricity - no fuel type selection needed")
+            fuel_type = "Electric"
+        elif v_type == "Hybrid":
+            st.info("🔄 Hybrid vehicles use both engine and battery")
+            fuel_type = "Hybrid"
+        elif v_type == "Motorbike":
+            st.info("🏍️ Motorbikes typically use petrol")
+            fuel_type = "Petrol"
+        elif v_type == "Three-Wheeler":
+            fuel_types = ["Petrol", "Diesel"]
+            fuel_type_default = st.session_state.vehicle_data.get("fuel_type", "Petrol")
+            fuel_type_index = fuel_types.index(fuel_type_default) if fuel_type_default in fuel_types else 0
+            fuel_type = st.selectbox("Fuel Type", fuel_types, index=fuel_type_index, key="fuel_type_tuk")
+        else:  # Petrol/Diesel Car
+            fuel_types = ["Petrol", "Diesel"]
+            fuel_type_default = st.session_state.vehicle_data.get("fuel_type", "Petrol")
+            fuel_type_index = fuel_types.index(fuel_type_default) if fuel_type_default in fuel_types else 0
+            fuel_type = st.selectbox("Fuel Type", fuel_types, index=fuel_type_index, key="fuel_type_car")
+        
+        st.divider()
+        st.subheader("📍 Location")
+        loc_c1, loc_c2 = st.columns(2)
+        with loc_c1:
+            district = st.selectbox(
+                "District", 
+                sorted(districts),
+                index=sorted(districts).index(st.session_state.vehicle_data.get("district", "Colombo")) if st.session_state.vehicle_data.get("district") in districts else 0,
+                key="district_select"
+            )
+        with loc_c2:
+            city = st.text_input(
+                "Nearest City", 
+                placeholder="e.g. Maharagama",
+                value=st.session_state.vehicle_data.get("city", ""),
+                key="city_input"
+            )
+        
         st.divider()
         st.subheader("🔧 Maintenance History")
-        st.info("💾 These values are loaded from database. Edit below if you need to update them.")
-        m1, m2 = st.columns(2)
-        with m1:
-            s_odo = st.number_input(
-                "Last Service (km)", 
-                min_value=0, 
-                step=500,
-                value=int(st.session_state.vehicle_data.get("s_odo", 0))
-            )
-        with m2:
-            a_odo = st.number_input(
-                "Last Alignment (km)", 
-                min_value=0, 
-                step=500,
-                value=int(st.session_state.vehicle_data.get("a_odo", 0))
-            )
+        
+        # Show different maintenance fields based on vehicle type
+        if v_type in ["Motorbike", "Three-Wheeler"]:
+            # For bikes and tuks: Tire pressure instead of alignment
+            st.info("🛞 Check tire pressure regularly for optimal performance and safety")
+            m1, m2 = st.columns(2)
+            with m1:
+                s_odo = st.number_input(
+                    "Last Service (km)", 
+                    min_value=0, 
+                    step=500,
+                    value=int(st.session_state.vehicle_data.get("s_odo", 0)),
+                    key="service_odo_bike"
+                )
+            with m2:
+                tp_check = st.number_input(
+                    "Last Tire Pressure Check (km)", 
+                    min_value=0, 
+                    step=500,
+                    value=int(st.session_state.vehicle_data.get("tp_check", 0)),
+                    key="tire_pressure_odo"
+                )
+            a_odo = tp_check  # Use tire pressure check for bikes/tuks instead of alignment
+        else:
+            # For cars: Regular service and alignment
+            st.info("💾 Last service and alignment odometer readings")
+            m1, m2 = st.columns(2)
+            with m1:
+                s_odo = st.number_input(
+                    "Last Service (km)", 
+                    min_value=0, 
+                    step=500,
+                    value=int(st.session_state.vehicle_data.get("s_odo", 0)),
+                    key="service_odo_car"
+                )
+            with m2:
+                a_odo = st.number_input(
+                    "Last Alignment (km)", 
+                    min_value=0, 
+                    step=500,
+                    value=int(st.session_state.vehicle_data.get("a_odo", 0)),
+                    key="alignment_odo"
+                )
         
         st.divider()
         st.subheader("🛣️ Recent Trip Data (Last 3 Trips)")

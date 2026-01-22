@@ -385,11 +385,17 @@ def get_advanced_report(v_type, model, m_year, odo, district, city, tyre_odo, al
 def analyze_vision_chat(image_file, user_query, vehicle_context):
     """Analyze vehicle image using Google Gemini Vision API"""
     try:
-        # Get API key
-        google_api_key = os.getenv("GOOGLE_API_KEY") or st.secrets.get("GOOGLE_API_KEY")
-        
+        # Get API key - with better error handling
+        google_api_key = os.getenv("GOOGLE_API_KEY")
         if not google_api_key:
-            return "❌ Google API key not configured. Please set GOOGLE_API_KEY in .env or secrets."
+            google_api_key = st.secrets.get("GOOGLE_API_KEY")
+        
+        # Strip quotes if present
+        if google_api_key:
+            google_api_key = google_api_key.strip('"\'')
+        
+        if not google_api_key or google_api_key.startswith("your_"):
+            return "❌ Google API key not configured. Please add GOOGLE_API_KEY to .env file with your actual key."
         
         # Configure Gemini
         genai.configure(api_key=google_api_key)

@@ -563,8 +563,6 @@ Note: For detailed image analysis, ask the user to describe what they see in the
             return "❌ API Error: Check your Groq API key configuration."
         else:
             return f"⚠️ Error analyzing image: {str(e)[:100]}"
-        else:
-            return f"❌ Analysis Error: {str(e)[:150]}"
 
 def generate_csv_report(report_data):
     """Generate CSV export of the report"""

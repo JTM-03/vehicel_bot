@@ -261,8 +261,8 @@ All changes are backwards compatible:
 ### .env file (No changes needed)
 Your existing .env already has:
 ```
-GOOGLE_API_KEY="AIzaSyBvpqCvMMb69_TiMknVyiMWTW__24vy5AE"
-GROQ_API_KEY="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"
+GOOGLE_API_KEY="your_google_gemini_api_key_here"
+GROQ_API_KEY="your_groq_api_key_here"
 ```
 
 Both are used:

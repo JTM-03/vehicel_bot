@@ -11,10 +11,7 @@ from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib import colors
 from datasets import dataset_handler
-try:
-    import google.genai as genai
-except ImportError:
-    import google.generativeai as genai
+import google.generativeai as genai
 import os
 from dotenv import load_dotenv
 

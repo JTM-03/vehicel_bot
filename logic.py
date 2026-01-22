@@ -82,61 +82,91 @@ def calculate_accident_risk(vehicle_condition, weather, road_conditions, parts_r
     risk_score = 0
     risk_factors = []
     
-    # Vehicle condition (0-40 points)
+    # Vehicle condition (0-40 points) - Main safety factors
     if vehicle_condition.get('service_overdue'):
-        risk_score += 15
-        risk_factors.append("⚠️ Service overdue")
+        risk_score += 18
+        risk_factors.append("⚠️ Service overdue - Engine efficiency compromised")
     if vehicle_condition.get('tyre_wear_high'):
-        risk_score += 12
-        risk_factors.append("⚠️ High tyre wear")
+        risk_score += 15
+        risk_factors.append("⚠️ High tyre wear - Reduced grip and braking")
     if vehicle_condition.get('brake_wear_high'):
-        risk_score += 13
-        risk_factors.append("⚠️ High brake wear")
+        risk_score += 18
+        risk_factors.append("⚠️ High brake wear - Increased stopping distance")
     
     # Parts replaced recently (reduces risk for those parts)
     if parts_replaced:
+        recent_replacements = len(parts_replaced)
+        # Each part replacement reduces risk by 5-8% depending on type
         for part in parts_replaced:
-            if 'Tyre' in part or 'Tyres' in part:
-                risk_score = max(0, risk_score - 8)  # Recently replaced tires = safer
-                risk_factors.append("✅ Tyres recently replaced")
+            if 'Tyre' in part or 'Tyres' in part or 'Tire' in part or 'Tires' in part:
+                risk_score = max(0, risk_score - 8)  # Recently replaced tires = safer handling
+                risk_factors.append("✅ Tyres recently replaced - Better grip and safety")
             elif 'Brake' in part:
-                risk_score = max(0, risk_score - 8)
-                risk_factors.append("✅ Brakes recently serviced")
-            elif 'Battery' in part:
+                risk_score = max(0, risk_score - 8)  # Brakes are critical
+                risk_factors.append("✅ Brakes recently serviced - Optimal stopping power")
+            elif 'Suspension' in part or 'Shock' in part:
+                risk_score = max(0, risk_score - 7)  # Suspension affects handling
+                risk_factors.append("✅ Suspension recently serviced - Better vehicle control")
+            elif 'Battery' in part or 'Alternator' in part:
                 risk_score = max(0, risk_score - 3)
-                risk_factors.append("✅ Battery recently replaced")
+                risk_factors.append("✅ Electrical components recently replaced")
+            elif 'Engine Oil' in part or 'Oil' in part:
+                risk_score = max(0, risk_score - 5)
+                risk_factors.append("✅ Engine oil recently changed - Engine protection")
+            else:
+                risk_score = max(0, risk_score - 4)
+                risk_factors.append(f"✅ {part} recently replaced")
     
-    # Weather conditions (0-30 points)
+    # Weather conditions (0-30 points) - Environmental hazards
     if weather:
-        if 'rain' in weather['condition'].lower():
-            risk_score += 10
-            risk_factors.append("🌧️ Rainy conditions")
-        if int(weather['wind_speed']) > 40:
-            risk_score += 10
-            risk_factors.append("💨 High winds")
+        if 'rain' in weather['condition'].lower() or 'drizzle' in weather['condition'].lower():
+            risk_score += 12
+            risk_factors.append("🌧️ Rainy conditions - Reduced grip and visibility")
+        if 'thunderstorm' in weather['condition'].lower() or 'heavy rain' in weather['condition'].lower():
+            risk_score += 18
+            risk_factors.append("⛈️ Heavy thunderstorm - Extreme visibility reduction")
+        if int(weather.get('wind_speed', 0)) > 50:
+            risk_score += 12
+            risk_factors.append("💨 Strong winds - Reduced vehicle stability")
+        elif int(weather.get('wind_speed', 0)) > 30:
+            risk_score += 6
+            risk_factors.append("💨 Moderate winds - Minor stability concern")
+        if int(weather.get('temp', 25)) > 35:
+            risk_score += 5
+            risk_factors.append("🌡️ High temperature - Brake fade risk, tire pressure increase")
     
-    # Road conditions (0-30 points)
-    if 'Mountain' in road_conditions:
-        risk_score += 12
-        risk_factors.append("⛰️ Mountain roads")
-    if 'Rough' in road_conditions:
-        risk_score += 10
-        risk_factors.append("🛣️ Rough roads")
-    if 'City' in road_conditions:
-        risk_score += 5
-        risk_factors.append("🏙️ City traffic")
+    # Road conditions (0-30 points) - Environmental hazards
+    if road_conditions:
+        if 'Mountain' in road_conditions:
+            risk_score += 15
+            risk_factors.append("⛰️ Mountain roads - High risk of brake failure, steering challenge")
+        if 'Rough' in road_conditions:
+            risk_score += 12
+            risk_factors.append("🛣️ Rough/Pothole roads - Suspension strain, puncture risk")
+        if 'City' in road_conditions:
+            risk_score += 5
+            risk_factors.append("🏙️ City traffic - Frequent braking, congestion stress")
+        if 'Highway' in road_conditions or 'Expressway' in road_conditions:
+            risk_score += 8
+            risk_factors.append("🛣️ High-speed roads - Higher impact speeds, longer stopping distance")
+        if 'Coastal' in road_conditions:
+            risk_score += 4
+            risk_factors.append("🌊 Coastal roads - Salt spray corrosion risk")
     
     # Ensure score is between 0-100
     risk_score = max(0, min(100, risk_score))
     
-    # Determine risk level
-    if risk_score >= 60:
+    # Determine risk level with accurate thresholds
+    if risk_score >= 75:
         risk_level = "🔴 CRITICAL"
+        color = "#ff0000"
+    elif risk_score >= 60:
+        risk_level = "🔴 HIGH"
         color = "#ff4444"
     elif risk_score >= 40:
-        risk_level = "🟠 HIGH"
+        risk_level = "🟠 MODERATE-HIGH"
         color = "#ff9900"
-    elif risk_score >= 20:
+    elif risk_score >= 25:
         risk_level = "🟡 MODERATE"
         color = "#ffcc00"
     else:
@@ -280,37 +310,61 @@ def get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, 
                 parts_mileage_analysis += f"  - {part}: Replaced at {mileage}km, {km_since}km ago (RISK REDUCTION: ~5%)\n"
     
     prompt = f"""
-    Act as a Sri Lankan Professional Automobile Mechanic (2026) analyzing vehicle risk.
+    You are an EXPERT Sri Lankan Professional Automobile Mechanic (2026) with deep knowledge of:
+    - Vehicle maintenance standards in Sri Lanka (tropical climate)
+    - Common vehicle failures based on road conditions and weather
+    - Safety standards and accident risk assessment
+    - Current maintenance costs in LKR with local taxes
     
     VEHICLE DETAILS:
     - Model: {m_year} {model} ({v_type})
     - Current Odometer: {odo}km
     - Last Service: {service_odo}km (km since service: {km_since_service}km)
     - Location: {city}, {district}
+    - Fuel Type: {fuel_type if fuel_type else 'Unknown'}
     
     MAINTENANCE NEEDS (from specialist database):
     {json.dumps(parts_to_replace, indent=2) if parts_to_replace else "No parts due for replacement"}
     {parts_mileage_analysis}
     
-    RECENT TRIPS:
-    {trips_summary}
+    RECENT TRIPS (showing road type and mileage):
+    {trips_summary if trips_summary else 'No recent trip data provided'}
     
     USER REPORTED ISSUES:
     {additional_notes if additional_notes else 'No issues reported'}
     
-    WEATHER (Today): {weather['condition'] if weather else 'N/A'} - {weather['temp'] if weather else 'N/A'}°C
-    ROAD CONDITIONS: {', '.join(road_conditions) if road_conditions else 'Unknown'}
+    ENVIRONMENTAL FACTORS:
+    - WEATHER (Today): {weather['condition'] if weather else 'N/A'} - {weather['temp'] if weather else 'N/A'}°C (Humidity: {weather.get('humidity', 'N/A')}%)
+    - ROAD CONDITIONS: {', '.join(road_conditions) if road_conditions else 'Unknown/Mixed'}
+    - DISTRICT: {district} (affects available services and road types)
     
-    TASK: Analyze vehicle risk considering recently replaced parts. Each recently replaced part REDUCES accident risk by approximately 5%.
-    Account for: (1) How recently parts were replaced, (2) Their condition and wear history, (3) Weather and road conditions impact on those parts.
+    ANALYSIS REQUIREMENTS:
+    1. Assess ACCIDENT RISK considering:
+       - Overdue maintenance items (service, alignment, filters)
+       - Recently replaced parts (REDUCE risk by ~5% each)
+       - Weather impact on vehicle control (especially for rain, wind)
+       - Road conditions impact (mountain roads = higher risk, city = moderate)
+       - Vehicle age and mileage correlation
+       - Sri Lankan road hazards (potholes, mixed traffic, weather severity)
     
-    Respond ONLY with valid JSON (no markdown, no extra text):
+    2. For CRITICAL ISSUES, only list issues that directly impact:
+       - Driving safety (brakes, steering, tires)
+       - Structural integrity (suspension, frame)
+       - Engine reliability (overdue service)
+    
+    3. Ensure ACCURACY by:
+       - Considering when parts were last replaced (recent replacements = safer)
+       - Adjusting base risk if vehicle is well-maintained
+       - Adding weather-specific warnings (e.g., wet roads = brake issues more critical)
+       - Factoring in Sri Lankan climate: high humidity, heavy monsoons, coastal salt spray
+    
+    4. Respond ONLY with valid JSON (no markdown, no extra text):
     {{
         "critical_issues": ["issue1", "issue2"],
         "accident_risk_analysis": {{
             "base_risk": 30,
             "critical_parts_impact": [
-                {{"part": "Brake Pads", "risk_increase": 15, "reason": "part details"}},
+                {{"part": "Brake Pads", "risk_increase": 15, "reason": "Overdue service + wet conditions"}},
             ],
             "service_overdue_impact": 10,
             "weather_impact": 5,

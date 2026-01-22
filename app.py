@@ -66,6 +66,86 @@ def display_formatted_report(report_data):
         
         st.divider()
         
+        # Weather Information
+        if report_data.get('weather'):
+            st.subheader("🌤️ Current Weather Conditions")
+            weather = report_data['weather']
+            col_w1, col_w2, col_w3 = st.columns(3)
+            with col_w1:
+                st.metric("Temperature", f"{weather.get('temp', 'N/A')}°C")
+            with col_w2:
+                st.metric("Condition", weather.get('condition', 'N/A'))
+            with col_w3:
+                st.metric("Humidity", f"{weather.get('humidity', 'N/A')}%")
+            st.caption(f"📍 {weather.get('location', 'N/A')}")
+        
+        st.divider()
+        
+        # Safety Instructions Based on Identified Issues
+        if data.get('critical_issues') or data.get('accident_risk_analysis'):
+            st.subheader("🚨 Safety Instructions While Driving")
+            
+            total_risk = data.get('accident_risk_analysis', {}).get('total_estimated_risk', 0)
+            
+            if total_risk > 70:
+                st.error("⛔ **HIGH RISK - Minimize driving until critical repairs are completed**")
+                st.markdown("""
+                **Driving Restrictions:**
+                - Avoid long-distance travel
+                - Drive only on well-lit routes during daylight
+                - Reduce speed significantly
+                - Avoid heavy traffic areas
+                - Do not drive at night
+                - Have vehicle towed for repairs
+                """)
+            elif total_risk > 50:
+                st.warning("⚠️ **MODERATE-HIGH RISK - Exercise extreme caution**")
+                st.markdown("""
+                **Driving Precautions:**
+                - Keep emergency contacts handy
+                - Drive at reduced speeds
+                - Avoid highway driving
+                - Maintain extra following distance
+                - Stay alert and avoid distractions
+                - Use hazard lights when necessary
+                - Schedule repairs within 48 hours
+                """)
+            elif total_risk > 30:
+                st.info("⚠️ **MODERATE RISK - Take precautions**")
+                st.markdown("""
+                **Driving Guidelines:**
+                - Maintain safe speeds
+                - Avoid sudden maneuvers
+                - Check mirrors frequently
+                - Be aware of vehicle handling changes
+                - Schedule repairs within 1-2 weeks
+                """)
+            else:
+                st.success("✅ **LOW RISK - Safe to drive with normal precautions**")
+                st.markdown("""
+                **Maintenance Reminder:**
+                - Schedule regular maintenance appointments
+                - Monitor vehicle condition
+                - Check recommended parts replacement
+                """)
+            
+            # Specific driving restrictions based on issues
+            if data.get('critical_issues'):
+                st.subheader("Specific Concerns & Driving Adjustments")
+                for issue in data['critical_issues'][:3]:  # Show top 3 issues
+                    if "brake" in issue.lower():
+                        st.warning("🔴 **Brake Issues Detected:** Increase braking distance. Test brakes in safe area before driving.")
+                    elif "steering" in issue.lower():
+                        st.warning("🔴 **Steering Issues Detected:** Avoid heavy steering inputs. Drive cautiously.")
+                    elif "tyre" in issue.lower() or "tire" in issue.lower():
+                        st.warning("🔴 **Tire Issues Detected:** Check tire pressure immediately. Avoid high speeds.")
+                    elif "engine" in issue.lower():
+                        st.warning("🔴 **Engine Issues Detected:** Avoid heavy acceleration. Have it serviced urgently.")
+                    elif "suspension" in issue.lower():
+                        st.warning("🔴 **Suspension Issues Detected:** Avoid rough roads. Drive smoothly.")
+        
+        st.divider()
+        
         # Critical Issues
         if data.get('critical_issues'):
             st.subheader("🔴 Critical Issues")
@@ -376,14 +456,15 @@ with tab1:
         
         with parts_col3:
             if parts_replaced:
-                st.write("**At what mileage?**")
+                st.write("**Odometer Reading (km) When Replaced?**")
                 parts_mileage = {}
                 for part in parts_replaced:
                     parts_mileage[part] = st.number_input(
-                        f"{part} - Mileage (km)",
+                        f"{part} - Odometer Reading (km)",
                         value=odo - 5000 if odo > 5000 else 0,
                         min_value=0,
-                        key=f"part_mileage_{part}"
+                        key=f"part_mileage_{part}",
+                        help="Enter the odometer reading when this part was replaced"
                     )
             else:
                 parts_mileage = {}

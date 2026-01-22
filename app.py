@@ -340,6 +340,10 @@ with tab1:
             if refresh:
                 st.session_state.vehicle_data = {"model": "", "city": "", "odo": 0, "district": "", "v_type": "", "m_year": 2018}
                 st.session_state.trips_data = []
+                if "three_recent_trips" in st.session_state:
+                    st.session_state.three_recent_trips = [{"date": datetime.now().date(), "km": 0, "road": []}]*3
+                if "parts_replaced" in st.session_state:
+                    st.session_state.parts_replaced = []
                 st.rerun()
 
 
@@ -368,7 +372,7 @@ with tab1:
                 if trip["km"] > 0:  # Only store non-zero trips
                     st.session_state.trips_data.append(trip)
             
-            report = logic.get_advanced_report(v_type, model, m_year, odo, district, city, 0, a_odo, s_odo, trips, parts_replaced, additional_notes)
+            report = logic.get_advanced_report(v_type, model, m_year, odo, district, city, 0, a_odo, s_odo, trips, parts_replaced, additional_notes, parts_mileage)
             
             # Update session state
             st.session_state.vehicle_data = vehicle_data
@@ -418,13 +422,19 @@ with tab2:
     # Chat submission
     col_send, col_clear = st.columns([3, 1])
     
+    send_button = None
+    clear_button = None
+    
     with col_send:
-        send_button = st.button("💬 Send Message", use_container_width=True)
+        send_button = st.button("💬 Send Message", use_container_width=True, key="send_msg_btn")
     
     with col_clear:
-        if st.button("🔄 Clear Chat", use_container_width=True):
-            st.session_state.chat_history = []
-            st.rerun()
+        clear_button = st.button("🔄 Clear Chat", use_container_width=True, key="clear_chat_btn")
+    
+    # Handle clear chat first (before processing messages)
+    if clear_button:
+        st.session_state.chat_history = []
+        st.rerun()
     
     # Process message
     if send_button and user_query:

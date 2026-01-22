@@ -11,6 +11,11 @@ from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib import colors
 from datasets import dataset_handler
+import google.generativeai as genai
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def get_weather_data(city):
     """Get current weather for the city"""
@@ -195,7 +200,7 @@ def get_vehicle_condition_description(odo, service_odo, align_odo, m_year, parts
     
     return description
 
-def get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, align_odo, service_odo, trips, parts_replaced=None, additional_notes=None):
+def get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, align_odo, service_odo, trips, parts_replaced=None, additional_notes=None, parts_mileage=None):
     """Generate structured report with sections - Using datasets for maintenance, APIs for weather/shops"""
     api_key = st.secrets.get("GROQ_API_KEY")
     llm = ChatGroq(model="llama-3.3-70b-versatile", groq_api_key=api_key)
@@ -238,7 +243,11 @@ def get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, 
     if parts_replaced:
         parts_info = "RECENT PARTS REPLACED:\n"
         for part in parts_replaced:
-            parts_info += f"  - {part}\n"
+            parts_info += f"  - {part}"
+            if parts_mileage and part in parts_mileage:
+                km_since_replacement = odo - parts_mileage[part]
+                parts_info += f" (replaced at {parts_mileage[part]}km, {km_since_replacement}km ago)"
+            parts_info += "\n"
     
     # GET MAINTENANCE RECOMMENDATIONS FROM DATASET
     maintenance_recommendations = dataset_handler.get_maintenance_recommendations(
@@ -260,6 +269,16 @@ def get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, 
     spare_parts_shops = get_spare_parts_shops(city, district)
     
     # Use AI for risk analysis, maintenance tips, and advisories only
+    
+    # Build parts mileage info for analysis
+    parts_mileage_analysis = ""
+    if parts_mileage:
+        parts_mileage_analysis = "\nRECENT PARTS REPLACEMENT HISTORY:\n"
+        for part, mileage in parts_mileage.items():
+            if part in (parts_replaced or []):
+                km_since = odo - mileage
+                parts_mileage_analysis += f"  - {part}: Replaced at {mileage}km, {km_since}km ago (RISK REDUCTION: ~5%)\n"
+    
     prompt = f"""
     Act as a Sri Lankan Professional Automobile Mechanic (2026) analyzing vehicle risk.
     
@@ -271,6 +290,7 @@ def get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, 
     
     MAINTENANCE NEEDS (from specialist database):
     {json.dumps(parts_to_replace, indent=2) if parts_to_replace else "No parts due for replacement"}
+    {parts_mileage_analysis}
     
     RECENT TRIPS:
     {trips_summary}
@@ -281,7 +301,8 @@ def get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, 
     WEATHER (Today): {weather['condition'] if weather else 'N/A'} - {weather['temp'] if weather else 'N/A'}°C
     ROAD CONDITIONS: {', '.join(road_conditions) if road_conditions else 'Unknown'}
     
-    TASK: Provide ONLY risk analysis insights and safety advisories. Maintenance needs are already determined from database.
+    TASK: Analyze vehicle risk considering recently replaced parts. Each recently replaced part REDUCES accident risk by approximately 5%.
+    Account for: (1) How recently parts were replaced, (2) Their condition and wear history, (3) Weather and road conditions impact on those parts.
     
     Respond ONLY with valid JSON (no markdown, no extra text):
     {{
@@ -357,31 +378,25 @@ def get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, 
         "structured_data": structured_data
     }
 
-def get_advanced_report(v_type, model, m_year, odo, district, city, tyre_odo, align_odo, service_odo, trips, parts_replaced=None, additional_notes=None):
+def get_advanced_report(v_type, model, m_year, odo, district, city, tyre_odo, align_odo, service_odo, trips, parts_replaced=None, additional_notes=None, parts_mileage=None):
     """Legacy function - returns structured report"""
-    return get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, align_odo, service_odo, trips, parts_replaced, additional_notes)
+    return get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, align_odo, service_odo, trips, parts_replaced, additional_notes, parts_mileage)
 
 def analyze_vision_chat(image_file, user_query, vehicle_context):
-    """Analyze vehicle image using vision AI"""
+    """Analyze vehicle image using Google Gemini Vision API"""
     try:
-        import base64
-        import os
-        import tempfile
-        from groq import Groq
+        # Get API key
+        google_api_key = os.getenv("GOOGLE_API_KEY") or st.secrets.get("GOOGLE_API_KEY")
         
-        api_key = st.secrets.get("GROQ_API_KEY")
-        if not api_key:
-            return "❌ API key not configured. Please set GROQ_API_KEY."
+        if not google_api_key:
+            return "❌ Google API key not configured. Please set GOOGLE_API_KEY in .env or secrets."
         
-        # Read and prepare image
+        # Configure Gemini
+        genai.configure(api_key=google_api_key)
+        
+        # Read image data
         image_data = image_file.read()
         image_file.seek(0)
-        
-        # Create Groq client
-        client = Groq(api_key=api_key)
-        
-        # Encode to base64
-        image_base64 = base64.b64encode(image_data).decode("utf-8")
         
         # Detect image type
         filename = image_file.name.lower()
@@ -392,60 +407,71 @@ def analyze_vision_chat(image_file, user_query, vehicle_context):
         else:
             mime_type = "image/jpeg"
         
-        # Prepare the message with proper structure for vision model
-        message = client.chat.completions.create(
-            model="llama-3.2-11b-vision-preview",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:{mime_type};base64,{image_base64}"
-                            }
-                        },
-                        {
-                            "type": "text",
-                            "text": f"""You are an expert Sri Lankan automotive mechanic (2026). Analyze this vehicle photo.
-
-VEHICLE: {vehicle_context}
-QUESTION: {user_query}
-
-Provide analysis in this format:
-• **What I see:** [part/component identification]
-• **Condition:** [Good/Fair/Poor]
-• **Issues Found:** [specific problems if any]
-• **Maintenance Required:** [what needs to be done]
-• **Est. Cost (LKR):** [price with 18% VAT + 2.5% SSCL]
-• **Urgency:** [Immediate/Soon/Preventive/None]
-
-Be brief, practical, and specific."""
-                        }
-                    ]
-                }
-            ],
-            max_tokens=1024,
-            temperature=0.3
-        )
+        # Prepare image for Gemini
+        image_part = {
+            "mime_type": mime_type,
+            "data": base64.standard_b64encode(image_data).decode("utf-8")
+        }
         
-        return message.choices[0].message.content
+        # Create the prompt
+        analysis_prompt = f"""You are an expert Sri Lankan automotive mechanic (2026). Analyze this vehicle photo carefully.
+
+VEHICLE CONTEXT: {vehicle_context}
+MECHANIC'S QUESTION: {user_query}
+
+Provide your analysis in this structured format:
+
+**What I See:**
+[Identify the specific part/component and its current state]
+
+**Condition Assessment:**
+[Rate as: Excellent/Good/Fair/Poor/Critical]
+
+**Issues Identified:**
+[List any visible problems, wear, damage, or concerns]
+
+**Recommended Maintenance:**
+[What needs to be done to fix/prevent issues]
+
+**Estimated Cost (LKR):**
+[Approximate price including 18% VAT and 2.5% SSCL]
+[If multiple options: Budget/Standard/Premium]
+
+**Urgency Level:**
+[Immediate/High Priority/Soon/Preventive/None]
+
+**Safety Impact:**
+[How this affects driving safety and accident risk]
+
+**Tips & Best Practices:**
+[Advice for maintaining this component in Sri Lanka's climate]
+
+Be specific, practical, and professional. Provide actionable advice."""
+        
+        # Use Gemini 1.5 Pro for better image understanding
+        model = genai.GenerativeModel('gemini-1.5-pro')
+        
+        response = model.generate_content([image_part, analysis_prompt])
+        
+        return response.text
         
     except Exception as e:
-        error_msg = str(e)
-        if "vision" in error_msg.lower() or "image" in error_msg.lower():
-            return f"""⚠️ Image Analysis Error
+        error_msg = str(e).lower()
+        if "image" in error_msg or "vision" in error_msg:
+            return """⚠️ Image Analysis Error
 
-The image couldn't be processed. This can happen if:
-- Image is too small or blurry
-- Image format is unsupported
-- Image quality is very poor
+The image couldn't be processed by Gemini. This can happen if:
+- Image is too small, blurry, or low quality
+- Image doesn't contain a recognizable vehicle part
+- File is corrupted or unsupported format
 
-💡 Try uploading a clearer, well-lit photo of the vehicle part."""
-        elif "api" in error_msg.lower():
-            return "❌ API Connection Error: Check your GROQ API key and internet connection."
+💡 Try uploading a clearer, well-lit photo of the specific vehicle part."""
+        elif "api" in error_msg or "key" in error_msg:
+            return "❌ API Error: Check your Google API key configuration and internet connection."
+        elif "rate" in error_msg:
+            return "⚠️ API Rate Limit: Too many requests. Please wait a moment and try again."
         else:
-            return f"❌ Analysis Error: {error_msg[:100]}"
+            return f"❌ Analysis Error: {str(e)[:150]}"
 
 def generate_csv_report(report_data):
     """Generate CSV export of the report"""

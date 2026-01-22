@@ -506,7 +506,6 @@ with tab1:
                 st.session_state.vehicle_data = {"model": "", "city": "", "odo": 0, "district": "Colombo", "v_type": "Petrol/Diesel Car", "fuel_type": "", "m_year": 2018, "s_odo": 0, "a_odo": 0, "tp_check": 0}
                 st.session_state.trips_data = []
                 st.session_state.three_recent_trips = [{"date": datetime.now().date(), "km": 0, "road": []}]*3
-                st.session_state.additional_notes = ""
                 # Don't manually reset widget-keyed session state - Streamlit manages these
                 st.rerun()
 

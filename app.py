@@ -61,14 +61,14 @@ def display_formatted_report(report_data):
         # Vehicle Condition Description
         if 'vehicle_condition' in report_data:
             st.divider()
-            st.subheader("🚗 Vehicle Condition Summary")
+            st.subheader("Vehicle Condition Summary")
             st.markdown(report_data['vehicle_condition'])
         
         st.divider()
         
         # Weather Information
         if report_data.get('weather'):
-            st.subheader("🌤️ Current Weather Conditions")
+            st.subheader("Current Weather Conditions")
             weather = report_data['weather']
             col_w1, col_w2, col_w3 = st.columns(3)
             with col_w1:
@@ -156,7 +156,7 @@ def display_formatted_report(report_data):
         
         # Parts to Replace
         if data.get('parts_to_replace'):
-            st.subheader("🔧 Parts to Replace (Impact on Accident Risk)")
+            st.subheader("Parts to Replace (Impact on Accident Risk)")
             for part in data['parts_to_replace']:
                 urgency = part.get('urgency', 'MODERATE')
                 if urgency == 'CRITICAL':
@@ -257,11 +257,13 @@ if "additional_notes" not in st.session_state:
 
 districts = ["Ampara", "Anuradhapura", "Badulla", "Batticaloa", "Colombo", "Galle", "Gampaha", "Hambantota", "Jaffna", "Kalutara", "Kandy", "Kegalle", "Kilinochchi", "Kurunegala", "Mannar", "Matale", "Matara", "Moneragala", "Mullaitivu", "Nuwara Eliya", "Polonnaruwa", "Puttalam", "Ratnapura", "Trincomalee", "Vavuniya"]
 
+st.image("logo.jpeg", width=90)
+
 st.markdown(
     """
-    <div style="text-align: center; padding: 25px 0;">
+    <div style="text-align: center; padding: 10px 0;">
         <h1 style="font-size: 46px; margin-bottom: 8px;">
-            🚗 AutoSense AI
+            AutoSense AI
         </h1>
         <h3 style="font-weight: 500; letter-spacing: 2px; color: #4f8bf9;">
             Predict | Prevent | Protect
@@ -272,13 +274,22 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+st.markdown(
+    """
+    <div style="text-align: center;">
+        <img src="logo.jpeg" width="90">
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
 
 tab1, tab2 = st.tabs([" Diagnostic & Report", " AI Mechanic Chat"])
 
 # --- TAB 1: FORM WITH TRIP DATA COLLECTION ---
 with tab1:
     with st.form("main_form"):
-        st.subheader("� Step 1: Vehicle Information")
+        st.subheader(" Vehicle Information")
         st.info(" First, tell us about your vehicle")
         
         c1, c2, c3, c4 = st.columns(4)
@@ -355,7 +366,7 @@ with tab1:
         # Show different maintenance fields based on vehicle type
         if v_type in ["Motorbike", "Three-Wheeler"]:
             # For bikes and tuks: Tire pressure instead of alignment
-            st.info("🛞 Check tire pressure regularly for optimal performance and safety")
+            st.info(" Check tire pressure regularly for optimal performance and safety")
             m1, m2 = st.columns(2)
             with m1:
                 s_odo = st.number_input(
@@ -439,7 +450,7 @@ with tab1:
             ]
 
         st.divider()
-        st.subheader("🔄 Recent Parts Replacements/Changes")
+        st.subheader(" Recent Parts Replacements/Changes")
         st.info(" Tell us about any parts you've replaced or changed recently to improve our recommendations.")
         
         parts_col1, parts_col2, parts_col3 = st.columns(3)
@@ -540,7 +551,7 @@ with tab1:
             # Update session state
             st.session_state.vehicle_data = vehicle_data
             
-            st.success("✅ Diagnostic Report Generated!")
+            st.success(" Diagnostic Report Generated!")
             display_formatted_report(report)
 
 # --- TAB 2: AI MECHANIC CHATBOT ---
@@ -558,7 +569,7 @@ with tab2:
             st.markdown(message["content"])
     
     # Photo upload
-    with st.expander("📸 Upload Vehicle Photo (Optional)", expanded=False):
+    with st.expander(" Upload Vehicle Photo (Optional)", expanded=False):
         photo = st.file_uploader(
             "Upload vehicle image for analysis",
             type=["jpg", "jpeg", "png"],

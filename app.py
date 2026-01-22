@@ -492,15 +492,17 @@ with tab1:
         col_submit, col_refresh = st.columns([3, 1])
         
         with col_submit:
-            submit = st.form_submit_button(" Generate Predictive Report", use_container_width=True)
+            submit = st.form_submit_button("🔍 Generate Predictive Report", use_container_width=True)
         
         with col_refresh:
-            refresh = st.form_submit_button(" Refresh Form", use_container_width=True)
+            refresh = st.form_submit_button("🔄 Clear Form", use_container_width=True)
             if refresh:
-                # Clear all form data
-                st.session_state.vehicle_data = {"model": "", "city": "", "odo": 0, "district": "", "v_type": "Petrol/Diesel Car", "fuel_type": "", "m_year": 2018, "s_odo": 0, "a_odo": 0, "tp_check": 0}
+                # Clear all form data from session state
+                st.session_state.vehicle_data = {"model": "", "city": "", "odo": 0, "district": "Colombo", "v_type": "Petrol/Diesel Car", "fuel_type": "", "m_year": 2018, "s_odo": 0, "a_odo": 0, "tp_check": 0}
                 st.session_state.trips_data = []
                 st.session_state.three_recent_trips = [{"date": datetime.now().date(), "km": 0, "road": []}]*3
+                # Don't try to reset widget-managed keys like parts_replaced, parts_dates, parts_mileage
+                # Let the form widgets handle their own state
                 st.rerun()
 
 

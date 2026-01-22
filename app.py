@@ -260,11 +260,11 @@ districts = ["Ampara", "Anuradhapura", "Badulla", "Batticaloa", "Colombo", "Gall
 col1, col2, col3 = st.columns([1, 1, 1])
 
 with col2:
-    st.image("logo.png", width=90)
+    st.image("logo.png", width=140)  # increased size
 
 st.markdown(
     """
-    <div style="text-align: center; padding: 10px 0;">
+    <div style="text-align: center; padding: 5px 0;">
         <h1 style="font-size: 46px; margin-bottom: 8px;">
             AutoSense AI
         </h1>
@@ -276,6 +276,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 

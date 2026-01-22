@@ -257,21 +257,26 @@ if "additional_notes" not in st.session_state:
 
 districts = ["Ampara", "Anuradhapura", "Badulla", "Batticaloa", "Colombo", "Galle", "Gampaha", "Hambantota", "Jaffna", "Kalutara", "Kandy", "Kegalle", "Kilinochchi", "Kurunegala", "Mannar", "Matale", "Matara", "Moneragala", "Mullaitivu", "Nuwara Eliya", "Polonnaruwa", "Puttalam", "Ratnapura", "Trincomalee", "Vavuniya"]
 
+col1, col2, col3 = st.columns([1, 1, 1])
+
+with col2:
+    st.image("logo.png", width=90)
+
 st.markdown(
     """
-    <div style="text-align: center;">
-        <img src="logo.png" width="90" style="margin-bottom: 10px;">
+    <div style="text-align: center; padding: 10px 0;">
         <h1 style="font-size: 46px; margin-bottom: 8px;">
             AutoSense AI
         </h1>
         <h3 style="font-weight: 500; letter-spacing: 2px; color: #4f8bf9;">
             Predict | Prevent | Protect
         </h3>
-        <hr style="margin-top: 15px;">
     </div>
+    <hr style="margin-top: 15px;">
     """,
     unsafe_allow_html=True
 )
+
 
 
 

@@ -489,6 +489,13 @@ with tab2:
     
     # Process message when user sends it
     if user_query:
+        # Add greeting only for the first message (when chat history is empty)
+        if len(st.session_state.chat_history) == 0:
+            st.session_state.chat_history.append({
+                "role": "assistant",
+                "content": "👋 Hello! I'm your AI Mechanic. I'm here to help with any vehicle maintenance, repair, or automotive questions. What can I help you with today?"
+            })
+        
         # Add user message to chat
         st.session_state.chat_history.append({
             "role": "user",

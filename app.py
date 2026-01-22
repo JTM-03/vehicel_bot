@@ -260,7 +260,7 @@ districts = ["Ampara", "Anuradhapura", "Badulla", "Batticaloa", "Colombo", "Gall
 st.markdown(
     """
     <div style="text-align: center;">
-        <img src="logo.jpeg" width="90" style="margin-bottom: 10px;">
+        <img src="logo.png" width="90" style="margin-bottom: 10px;">
         <h1 style="font-size: 46px; margin-bottom: 8px;">
             AutoSense AI
         </h1>

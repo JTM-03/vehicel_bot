@@ -549,7 +549,7 @@ with tab1:
 
 # --- TAB 2: AI MECHANIC CHATBOT ---
 with tab2:
-    st.subheader(" AI Mechanic Chatbot")
+    st.subheader(" AutoSense Chatbot")
     st.info("Chat with the AI mechanic for tips and advice. Optionally upload a photo for image analysis.")
     
     # Initialize chat history for this session

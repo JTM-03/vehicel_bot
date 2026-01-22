@@ -16,7 +16,7 @@ def display_formatted_report(report_data):
         data = report_data['structured_data']
         
         # Title
-        st.title(f"🔧 Vehicle Maintenance Report")
+        st.title(f" Vehicle Maintenance Report")
         st.markdown(f"**Vehicle:** {meta['vehicle']} | **Location:** {meta['location']} | **Odometer:** {meta['current_odometer']} km")
         st.divider()
         
@@ -32,7 +32,7 @@ def display_formatted_report(report_data):
         # Show detailed risk breakdown if available
         if data.get('accident_risk_analysis'):
             st.divider()
-            st.subheader("📊 Risk Breakdown Analysis")
+            st.subheader(" Risk Breakdown Analysis")
             analysis = data['accident_risk_analysis']
             
             # Show total risk
@@ -77,13 +77,13 @@ def display_formatted_report(report_data):
                 st.metric("Condition", weather.get('condition', 'N/A'))
             with col_w3:
                 st.metric("Humidity", f"{weather.get('humidity', 'N/A')}%")
-            st.caption(f"📍 {weather.get('location', 'N/A')}")
+            st.caption(f" {weather.get('location', 'N/A')}")
         
         st.divider()
         
         # Safety Instructions Based on Identified Issues
         if data.get('critical_issues') or data.get('accident_risk_analysis'):
-            st.subheader("🚨 Safety Instructions While Driving")
+            st.subheader(" Safety Instructions While Driving")
             
             total_risk = data.get('accident_risk_analysis', {}).get('total_estimated_risk', 0)
             
@@ -121,7 +121,7 @@ def display_formatted_report(report_data):
                 - Schedule repairs within 1-2 weeks
                 """)
             else:
-                st.success("✅ **LOW RISK - Safe to drive with normal precautions**")
+                st.success(" **LOW RISK - Safe to drive with normal precautions**")
                 st.markdown("""
                 **Maintenance Reminder:**
                 - Schedule regular maintenance appointments
@@ -172,15 +172,15 @@ def display_formatted_report(report_data):
                     st.write(f"**Urgency:** {urgency}")
                     st.write(f"**Estimated Cost:** LKR {part.get('estimated_cost_lkr', 0):,}")
                     if risk_reduction > 0:
-                        st.success(f"✅ Replacing this part will **reduce accident risk by {risk_reduction}%**")
+                        st.success(f" Replacing this part will **reduce accident risk by {risk_reduction}%**")
         
         st.divider()
         
         # Spare Parts Shops
         if data.get('spare_parts_shops'):
-            st.subheader("🏪 Spare Parts Shops Near You")
+            st.subheader(" Spare Parts Shops Near You")
             for shop in data['spare_parts_shops']:
-                with st.expander(f"📍 {shop.get('name', 'Unknown')} - {shop.get('location', 'N/A')}"):
+                with st.expander(f" {shop.get('name', 'Unknown')} - {shop.get('location', 'N/A')}"):
                     st.write(f"**Phone:** {shop.get('phone', 'N/A')}")
                     st.write(f"**Specialty:** {shop.get('specialty', 'N/A')}")
         
@@ -188,7 +188,7 @@ def display_formatted_report(report_data):
         
         # Maintenance Tips
         if data.get('maintenance_tips'):
-            st.subheader("💡 Maintenance Tips")
+            st.subheader(" Maintenance Tips")
             for tip in data['maintenance_tips']:
                 st.info(f"✓ {tip}")
         
@@ -198,13 +198,13 @@ def display_formatted_report(report_data):
         col1, col2 = st.columns(2)
         with col1:
             if data.get('road_specific_warnings'):
-                st.subheader("🛣️ Road-Specific Warnings")
+                st.subheader(" Road-Specific Warnings")
                 for warning in data['road_specific_warnings']:
                     st.warning(f"⚠️ {warning}")
         
         with col2:
             if data.get('weather_advisories'):
-                st.subheader("🌤️ Weather Advisories")
+                st.subheader(" Weather Advisories")
                 for advisory in data['weather_advisories']:
                     st.warning(f"⚠️ {advisory}")
         
@@ -216,7 +216,7 @@ def display_formatted_report(report_data):
         with col_csv:
             csv_content = logic.generate_csv_report(report_data)
             st.download_button(
-                label="📊 Download as CSV",
+                label=" Download as CSV",
                 data=csv_content,
                 file_name=f"vehicle_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv",
@@ -227,7 +227,7 @@ def display_formatted_report(report_data):
             pdf_content = logic.generate_pdf_report(report_data)
             if pdf_content:
                 st.download_button(
-                    label="📄 Download as PDF",
+                    label=" Download as PDF",
                     data=pdf_content,
                     file_name=f"vehicle_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
                     mime="application/pdf",
@@ -257,16 +257,29 @@ if "additional_notes" not in st.session_state:
 
 districts = ["Ampara", "Anuradhapura", "Badulla", "Batticaloa", "Colombo", "Galle", "Gampaha", "Hambantota", "Jaffna", "Kalutara", "Kandy", "Kegalle", "Kilinochchi", "Kurunegala", "Mannar", "Matale", "Matara", "Moneragala", "Mullaitivu", "Nuwara Eliya", "Polonnaruwa", "Puttalam", "Ratnapura", "Trincomalee", "Vavuniya"]
 
-st.title("🚜 Sri Lanka Pro-Vehicle Engine (2026)")
-st.markdown("---")
+st.markdown(
+    """
+    <div style="text-align: center; padding: 25px 0;">
+        <h1 style="font-size: 46px; margin-bottom: 8px;">
+            🚗 AutoSense AI
+        </h1>
+        <h3 style="font-weight: 500; letter-spacing: 2px; color: #4f8bf9;">
+            Predict | Prevent | Protect
+        </h3>
+    </div>
+    <hr style="margin-top: 15px;">
+    """,
+    unsafe_allow_html=True
+)
 
-tab1, tab2 = st.tabs(["📋 Diagnostic & Report", "💬 AI Mechanic Chat"])
+
+tab1, tab2 = st.tabs([" Diagnostic & Report", " AI Mechanic Chat"])
 
 # --- TAB 1: FORM WITH TRIP DATA COLLECTION ---
 with tab1:
     with st.form("main_form"):
         st.subheader("� Step 1: Vehicle Information")
-        st.info("👇 First, tell us about your vehicle")
+        st.info(" First, tell us about your vehicle")
         
         c1, c2, c3, c4 = st.columns(4)
         with c1:
@@ -319,7 +332,7 @@ with tab1:
             fuel_type = "Petrol"  # Default for cars
         
         st.divider()
-        st.subheader("📍 Location")
+        st.subheader(" Location")
         loc_c1, loc_c2 = st.columns(2)
         with loc_c1:
             district = st.selectbox(
@@ -337,7 +350,7 @@ with tab1:
             )
         
         st.divider()
-        st.subheader("🔧 Maintenance History")
+        st.subheader(" Maintenance History")
         
         # Show different maintenance fields based on vehicle type
         if v_type in ["Motorbike", "Three-Wheeler"]:
@@ -363,7 +376,7 @@ with tab1:
             a_odo = tp_check  # Use tire pressure check for bikes/tuks instead of alignment
         else:
             # For cars: Regular service and alignment
-            st.info("💾 Last service and alignment odometer readings")
+            st.info(" Last service and alignment odometer readings")
             m1, m2 = st.columns(2)
             with m1:
                 s_odo = st.number_input(
@@ -383,14 +396,14 @@ with tab1:
                 )
         
         st.divider()
-        st.subheader("🛣️ Recent Trip Data (Last 3 Trips)")
-        st.info("💡 Tip: Enter your recent trips to get accurate maintenance predictions based on actual road conditions.")
+        st.subheader(" Recent Trip Data (Last 3 Trips)")
+        st.info(" Tip: Enter your recent trips to get accurate maintenance predictions based on actual road conditions.")
         
         trips = []
         if st.session_state.trips_data:
             st.write("**Your stored trips:**")
             for idx, trip in enumerate(st.session_state.trips_data[-3:]):
-                st.caption(f"📅 {trip.get('date', 'N/A')} | 🛣️ {trip.get('km', 0)} km | 🗺️ {', '.join(trip.get('road', []))}")
+                st.caption(f" {trip.get('date', 'N/A')} |  {trip.get('km', 0)} km |  {', '.join(trip.get('road', []))}")
             
             if len(st.session_state.trips_data) >= 3:
                 st.success("✓ All 3 trips recorded! Ready for analysis.")
@@ -427,7 +440,7 @@ with tab1:
 
         st.divider()
         st.subheader("🔄 Recent Parts Replacements/Changes")
-        st.info("📌 Tell us about any parts you've replaced or changed recently to improve our recommendations.")
+        st.info(" Tell us about any parts you've replaced or changed recently to improve our recommendations.")
         
         parts_col1, parts_col2, parts_col3 = st.columns(3)
         
@@ -480,10 +493,10 @@ with tab1:
         col_submit, col_refresh = st.columns([3, 1])
         
         with col_submit:
-            submit = st.form_submit_button("🔍 Generate Predictive Report", use_container_width=True)
+            submit = st.form_submit_button(" Generate Predictive Report", use_container_width=True)
         
         with col_refresh:
-            refresh = st.form_submit_button("🔄 Refresh Form", use_container_width=True)
+            refresh = st.form_submit_button(" Refresh Form", use_container_width=True)
             if refresh:
                 # Clear all form data
                 st.session_state.vehicle_data = {"model": "", "city": "", "odo": 0, "district": "", "v_type": "Petrol/Diesel Car", "fuel_type": "", "m_year": 2018, "s_odo": 0, "a_odo": 0, "tp_check": 0}
@@ -532,7 +545,7 @@ with tab1:
 
 # --- TAB 2: AI MECHANIC CHATBOT ---
 with tab2:
-    st.subheader("💬 AI Mechanic Chatbot")
+    st.subheader(" AI Mechanic Chatbot")
     st.info("Chat with the AI mechanic for tips and advice. Optionally upload a photo for image analysis.")
     
     # Initialize chat history for this session
@@ -558,7 +571,7 @@ with tab2:
     # Clear chat button
     col_clear = st.columns([6, 1])[1]
     with col_clear:
-        if st.button("🔄 Clear Chat", use_container_width=True, key="clear_chat_btn"):
+        if st.button(" Clear Chat", use_container_width=True, key="clear_chat_btn"):
             st.session_state.chat_history = []
             st.rerun()
     
@@ -584,7 +597,7 @@ with tab2:
         })
         
         # Get AI response
-        with st.spinner("🤖 AI Mechanic is thinking..."):
+        with st.spinner(" AI Mechanic is thinking..."):
             try:
                 vehicle_context = f"{st.session_state.vehicle_data.get('model', 'Vehicle')} in {st.session_state.vehicle_data.get('city', 'Location')}"
                 

@@ -68,7 +68,7 @@ def display_formatted_report(report_data):
         
         # Weather Information
         if report_data.get('weather'):
-            st.subheader("Current Weather Conditions")
+            st.subheader("🌤️ Current Weather Conditions")
             weather = report_data['weather']
             col_w1, col_w2, col_w3 = st.columns(3)
             with col_w1:
@@ -77,7 +77,10 @@ def display_formatted_report(report_data):
                 st.metric("Condition", weather.get('condition', 'N/A'))
             with col_w3:
                 st.metric("Humidity", f"{weather.get('humidity', 'N/A')}%")
-            st.caption(f" {weather.get('location', 'N/A')}")
+            st.caption(f"📍 {weather.get('location', 'N/A')}")
+            st.info("⚠️ **Weather Disclaimer:** Weather data is sourced from real-time APIs. For critical driving decisions, verify conditions with local weather services or your vehicle's weather monitoring system. Weather can change rapidly, especially in Sri Lanka's tropical climate.")
+        else:
+            st.warning("⚠️ Weather data unavailable. Verify local weather conditions before driving.")
         
         st.divider()
         
@@ -246,14 +249,6 @@ if "three_recent_trips" not in st.session_state:
     st.session_state.three_recent_trips = [{"date": datetime.now().date(), "km": 0, "road": []}]*3
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
-if "parts_replaced" not in st.session_state:
-    st.session_state.parts_replaced = []
-if "parts_dates" not in st.session_state:
-    st.session_state.parts_dates = {}
-if "parts_mileage" not in st.session_state:
-    st.session_state.parts_mileage = {}
-if "additional_notes" not in st.session_state:
-    st.session_state.additional_notes = ""
 
 districts = ["Ampara", "Anuradhapura", "Badulla", "Batticaloa", "Colombo", "Galle", "Gampaha", "Hambantota", "Jaffna", "Kalutara", "Kandy", "Kegalle", "Kilinochchi", "Kurunegala", "Mannar", "Matale", "Matara", "Moneragala", "Mullaitivu", "Nuwara Eliya", "Polonnaruwa", "Puttalam", "Ratnapura", "Trincomalee", "Vavuniya"]
 
@@ -506,10 +501,6 @@ with tab1:
                 st.session_state.vehicle_data = {"model": "", "city": "", "odo": 0, "district": "", "v_type": "Petrol/Diesel Car", "fuel_type": "", "m_year": 2018, "s_odo": 0, "a_odo": 0, "tp_check": 0}
                 st.session_state.trips_data = []
                 st.session_state.three_recent_trips = [{"date": datetime.now().date(), "km": 0, "road": []}]*3
-                st.session_state.parts_replaced = []
-                st.session_state.parts_dates = {}
-                st.session_state.parts_mileage = {}
-                st.session_state.additional_notes = ""
                 st.rerun()
 
 

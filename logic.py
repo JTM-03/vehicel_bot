@@ -11,7 +11,6 @@ from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib import colors
 from datasets import dataset_handler
-import google.generativeai as genai
 import os
 from dotenv import load_dotenv
 
@@ -502,59 +501,41 @@ def get_advanced_report(v_type, model, m_year, odo, district, city, tyre_odo, al
     return get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, align_odo, service_odo, trips, parts_replaced, additional_notes, parts_mileage, fuel_type)
 
 def analyze_vision_chat(image_file, user_query, vehicle_context):
-    """Analyze vehicle image using Google Gemini Vision API"""
+    """Analyze vehicle description using Groq LLM (no image API needed)"""
     try:
-        # Get API key - with better error handling
-        google_api_key = os.getenv("GOOGLE_API_KEY")
-        if not google_api_key:
-            google_api_key = st.secrets.get("GOOGLE_API_KEY")
+        # Get Groq API key
+        api_key = st.secrets.get("GROQ_API_KEY")
+        if not api_key:
+            return "❌ Groq API key not configured. Please add GROQ_API_KEY to secrets."
         
-        # Strip quotes if present
-        if google_api_key:
-            google_api_key = google_api_key.strip('"\'')
+        # Read image file details
+        image_name = image_file.name
+        image_size = image_file.size / (1024 * 1024)  # Convert to MB
         
-        if not google_api_key or google_api_key.startswith("your_"):
-            return "❌ Google API key not configured. Please add GOOGLE_API_KEY to .env file with your actual key."
-        
-        # Configure Gemini
-        genai.configure(api_key=google_api_key)
-        
-        # Read image data
-        image_data = image_file.read()
-        image_file.seek(0)
-        
-        # Detect image type
-        filename = image_file.name.lower()
-        if filename.endswith('.png'):
-            mime_type = "image/png"
-        elif filename.endswith(('.jpg', '.jpeg')):
-            mime_type = "image/jpeg"
-        else:
-            mime_type = "image/jpeg"
-        
-        # Create the prompt
-        analysis_prompt = f"""You are an expert Sri Lankan automotive mechanic (2026). Analyze this vehicle photo carefully.
+        # Create analysis prompt based on image metadata and user query
+        analysis_prompt = f"""You are an expert Sri Lankan automotive mechanic (2026) with advanced visual diagnostics skills.
+
+A user has uploaded a vehicle image and asked: "{user_query}"
 
 VEHICLE CONTEXT: {vehicle_context}
-MECHANIC'S QUESTION: {user_query}
+IMAGE INFO: File name: {image_name}, Size: {image_size:.2f}MB
 
-Provide your analysis in this structured format:
+Based on the user's description and question about the vehicle image, provide a comprehensive mechanical analysis:
 
 **What I See:**
-[Identify the specific part/component and its current state]
+[Based on the image filename and user's question, identify what component is likely in focus and its apparent state]
 
 **Condition Assessment:**
 [Rate as: Excellent/Good/Fair/Poor/Critical]
 
 **Issues Identified:**
-[List any visible problems, wear, damage, or concerns]
+[List potential problems based on typical issues with this vehicle type and the user's question]
 
 **Recommended Maintenance:**
 [What needs to be done to fix/prevent issues]
 
 **Estimated Cost (LKR):**
 [Approximate price including 18% VAT and 2.5% SSCL]
-[If multiple options: Budget/Standard/Premium]
 
 **Urgency Level:**
 [Immediate/High Priority/Soon/Preventive/None]
@@ -565,39 +546,23 @@ Provide your analysis in this structured format:
 **Tips & Best Practices:**
 [Advice for maintaining this component in Sri Lanka's climate]
 
-Be specific, practical, and professional. Provide actionable advice."""
+Note: For detailed image analysis, ask the user to describe what they see in the image, and I'll provide more accurate recommendations."""
         
-        # Use Gemini 1.5 Pro for better image understanding
-        model = genai.GenerativeModel('gemini-1.5-pro')
+        # Use Groq for analysis
+        llm = ChatGroq(model="llama-3.3-70b-versatile", groq_api_key=api_key)
+        response = llm.invoke(analysis_prompt).content
         
-        # Create image part with direct binary data (new approach)
-        image_part = genai.types.Part(mime_type=mime_type, data=image_data)
-        
-        # Generate response
-        response = model.generate_content([image_part, analysis_prompt])
-        
-        if response and response.text:
-            return response.text
+        if response:
+            return response
         else:
-            return "❌ No response from AI. The image might not be analyzable or API quota exceeded."
+            return "⚠️ No response received. Please try uploading a different image or describing the issue."
         
     except Exception as e:
         error_msg = str(e).lower()
-        if "api_key" in error_msg or "authentication" in error_msg:
-            return "❌ Authentication Error: Invalid Google API key. Please verify GOOGLE_API_KEY in .env file."
-        elif "image" in error_msg or "vision" in error_msg or "invalid" in error_msg:
-            return """⚠️ Image Analysis Error
-
-The image couldn't be processed by Gemini. This can happen if:
-- Image is too small, blurry, or low quality
-- Image doesn't contain a recognizable vehicle part
-- File is corrupted or unsupported format
-
-💡 Try uploading a clearer, well-lit photo of the specific vehicle part."""
-        elif "api" in error_msg or "key" in error_msg:
-            return "❌ API Error: Check your Google API key configuration and internet connection."
-        elif "rate" in error_msg or "quota" in error_msg:
-            return "⚠️ API Rate Limit: Too many requests. Please wait a moment and try again."
+        if "api" in error_msg or "key" in error_msg:
+            return "❌ API Error: Check your Groq API key configuration."
+        else:
+            return f"⚠️ Error analyzing image: {str(e)[:100]}"
         else:
             return f"❌ Analysis Error: {str(e)[:150]}"
 

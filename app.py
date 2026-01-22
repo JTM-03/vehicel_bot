@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 import json
 
-st.set_page_config(page_title="SL AI Mechanic 2026", layout="wide")
+st.set_page_config(page_title="AI Mechanic", layout="wide")
 
 def display_formatted_report(report_data):
     """Display a formatted and colored report"""
@@ -167,9 +167,6 @@ districts = ["Ampara", "Anuradhapura", "Badulla", "Batticaloa", "Colombo", "Gall
 
 st.title("🚜 Sri Lanka Pro-Vehicle Engine (2026)")
 st.markdown("---")
-st.info("📌 Enter vehicle data below and generate a diagnostic report. Data is analyzed but not stored.")
-
-st.markdown("---")
 
 tab1, tab2 = st.tabs(["📋 Diagnostic & Report", "💬 AI Mechanic Chat"])
 
@@ -193,6 +190,26 @@ with tab1:
                 value=st.session_state.vehicle_data.get("model", "")
             )
         with c2:
+            # Determine available fuel types based on vehicle type
+            if v_type == "EV":
+                fuel_types = ["Electric"]
+            elif v_type == "Hybrid":
+                fuel_types = ["Hybrid"]
+            elif v_type == "Motorbike":
+                fuel_types = ["Petrol"]
+            elif v_type == "Three-Wheeler":
+                fuel_types = ["Petrol", "Diesel"]
+            else:  # Petrol/Diesel Car
+                fuel_types = ["Petrol", "Diesel"]
+            
+            fuel_type_default = st.session_state.vehicle_data.get("fuel_type", fuel_types[0])
+            fuel_type_index = fuel_types.index(fuel_type_default) if fuel_type_default in fuel_types else 0
+            fuel_type = st.selectbox(
+                "Fuel Type",
+                fuel_types,
+                index=fuel_type_index
+            )
+            
             district = st.selectbox(
                 "District", 
                 sorted(districts),
@@ -338,7 +355,7 @@ with tab1:
         with col_refresh:
             refresh = st.form_submit_button("🔄 Refresh Form", use_container_width=True)
             if refresh:
-                st.session_state.vehicle_data = {"model": "", "city": "", "odo": 0, "district": "", "v_type": "", "m_year": 2018}
+                st.session_state.vehicle_data = {"model": "", "city": "", "odo": 0, "district": "", "v_type": "", "fuel_type": "", "m_year": 2018}
                 st.session_state.trips_data = []
                 if "three_recent_trips" in st.session_state:
                     st.session_state.three_recent_trips = [{"date": datetime.now().date(), "km": 0, "road": []}]*3
@@ -358,6 +375,7 @@ with tab1:
             # Prepare vehicle data
             vehicle_data = {
                 "v_type": v_type,
+                "fuel_type": fuel_type,
                 "model": model,
                 "district": district,
                 "city": city,
@@ -372,7 +390,7 @@ with tab1:
                 if trip["km"] > 0:  # Only store non-zero trips
                     st.session_state.trips_data.append(trip)
             
-            report = logic.get_advanced_report(v_type, model, m_year, odo, district, city, 0, a_odo, s_odo, trips, parts_replaced, additional_notes, parts_mileage)
+            report = logic.get_advanced_report(v_type, model, m_year, odo, district, city, 0, a_odo, s_odo, trips, parts_replaced, additional_notes, parts_mileage, fuel_type)
             
             # Update session state
             st.session_state.vehicle_data = vehicle_data

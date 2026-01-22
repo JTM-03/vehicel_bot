@@ -11,7 +11,10 @@ from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib import colors
 from datasets import dataset_handler
-import google.generativeai as genai
+try:
+    import google.genai as genai
+except ImportError:
+    import google.generativeai as genai
 import os
 from dotenv import load_dotenv
 
@@ -200,7 +203,7 @@ def get_vehicle_condition_description(odo, service_odo, align_odo, m_year, parts
     
     return description
 
-def get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, align_odo, service_odo, trips, parts_replaced=None, additional_notes=None, parts_mileage=None):
+def get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, align_odo, service_odo, trips, parts_replaced=None, additional_notes=None, parts_mileage=None, fuel_type=None):
     """Generate structured report with sections - Using datasets for maintenance, APIs for weather/shops"""
     api_key = st.secrets.get("GROQ_API_KEY")
     llm = ChatGroq(model="llama-3.3-70b-versatile", groq_api_key=api_key)
@@ -251,7 +254,7 @@ def get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, 
     
     # GET MAINTENANCE RECOMMENDATIONS FROM DATASET
     maintenance_recommendations = dataset_handler.get_maintenance_recommendations(
-        v_type, odo, service_odo
+        v_type, odo, service_odo, fuel_type
     )
     
     # Convert dataset recommendations to JSON format
@@ -378,9 +381,9 @@ def get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, 
         "structured_data": structured_data
     }
 
-def get_advanced_report(v_type, model, m_year, odo, district, city, tyre_odo, align_odo, service_odo, trips, parts_replaced=None, additional_notes=None, parts_mileage=None):
+def get_advanced_report(v_type, model, m_year, odo, district, city, tyre_odo, align_odo, service_odo, trips, parts_replaced=None, additional_notes=None, parts_mileage=None, fuel_type=None):
     """Legacy function - returns structured report"""
-    return get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, align_odo, service_odo, trips, parts_replaced, additional_notes, parts_mileage)
+    return get_structured_report(v_type, model, m_year, odo, district, city, tyre_odo, align_odo, service_odo, trips, parts_replaced, additional_notes, parts_mileage, fuel_type)
 
 def analyze_vision_chat(image_file, user_query, vehicle_context):
     """Analyze vehicle image using Google Gemini Vision API"""
@@ -406,12 +409,6 @@ def analyze_vision_chat(image_file, user_query, vehicle_context):
             mime_type = "image/jpeg"
         else:
             mime_type = "image/jpeg"
-        
-        # Prepare image for Gemini
-        image_part = {
-            "mime_type": mime_type,
-            "data": base64.standard_b64encode(image_data).decode("utf-8")
-        }
         
         # Create the prompt
         analysis_prompt = f"""You are an expert Sri Lankan automotive mechanic (2026). Analyze this vehicle photo carefully.
@@ -451,13 +448,22 @@ Be specific, practical, and professional. Provide actionable advice."""
         # Use Gemini 1.5 Pro for better image understanding
         model = genai.GenerativeModel('gemini-1.5-pro')
         
+        # Create image part with direct binary data (new approach)
+        image_part = genai.types.Part(mime_type=mime_type, data=image_data)
+        
+        # Generate response
         response = model.generate_content([image_part, analysis_prompt])
         
-        return response.text
+        if response and response.text:
+            return response.text
+        else:
+            return "❌ No response from AI. The image might not be analyzable or API quota exceeded."
         
     except Exception as e:
         error_msg = str(e).lower()
-        if "image" in error_msg or "vision" in error_msg:
+        if "api_key" in error_msg or "authentication" in error_msg:
+            return "❌ Authentication Error: Invalid Google API key. Please verify GOOGLE_API_KEY in .env file."
+        elif "image" in error_msg or "vision" in error_msg or "invalid" in error_msg:
             return """⚠️ Image Analysis Error
 
 The image couldn't be processed by Gemini. This can happen if:
@@ -468,7 +474,7 @@ The image couldn't be processed by Gemini. This can happen if:
 💡 Try uploading a clearer, well-lit photo of the specific vehicle part."""
         elif "api" in error_msg or "key" in error_msg:
             return "❌ API Error: Check your Google API key configuration and internet connection."
-        elif "rate" in error_msg:
+        elif "rate" in error_msg or "quota" in error_msg:
             return "⚠️ API Rate Limit: Too many requests. Please wait a moment and try again."
         else:
             return f"❌ Analysis Error: {str(e)[:150]}"

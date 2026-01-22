@@ -147,14 +147,68 @@ class DatasetHandler:
             st.warning(f"Could not load tuk maintenance: {e}")
             return None
     
+    def get_car_parts_info(self, fuel_type="Petrol"):
+        """Get car parts pricing based on fuel type"""
+        # Base parts for all cars
+        base_parts = {
+            "Engine Oil (5L)": {"Price_LKR": 8500, "Interval_km": 8000, "Urgency": "CRITICAL"},
+            "Oil Filter": {"Price_LKR": 1800, "Interval_km": 8000, "Urgency": "CRITICAL"},
+            "Brake Fluid": {"Price_LKR": 2500, "Interval_km": 20000, "Urgency": "MEDIUM"},
+            "Coolant Flush": {"Price_LKR": 3500, "Interval_km": 40000, "Urgency": "MEDIUM"},
+            "Air Filter": {"Price_LKR": 2200, "Interval_km": 15000, "Urgency": "MEDIUM"},
+            "Wheel Alignment": {"Price_LKR": 4500, "Interval_km": 10000, "Urgency": "HIGH"},
+            "Tire Rotation": {"Price_LKR": 2000, "Interval_km": 8000, "Urgency": "MEDIUM"},
+            "Spark Plugs": {"Price_LKR": 3500, "Interval_km": 20000, "Urgency": "MEDIUM"},
+            "Brake Pads": {"Price_LKR": 6500, "Interval_km": 30000, "Urgency": "HIGH"}
+        }
+        
+        # Fuel-specific parts
+        if fuel_type == "EV" or fuel_type == "Electric":
+            # EV specific: no oil, no spark plugs, no carbon filter
+            ev_parts = {
+                "Brake Fluid": {"Price_LKR": 2500, "Interval_km": 20000, "Urgency": "MEDIUM"},
+                "Coolant Flush (Battery)": {"Price_LKR": 4500, "Interval_km": 40000, "Urgency": "MEDIUM"},
+                "Air Filter (Cabin)": {"Price_LKR": 2200, "Interval_km": 15000, "Urgency": "MEDIUM"},
+                "Wheel Alignment": {"Price_LKR": 4500, "Interval_km": 10000, "Urgency": "HIGH"},
+                "Tire Rotation": {"Price_LKR": 2000, "Interval_km": 8000, "Urgency": "MEDIUM"},
+                "Brake Pads (Regenerative)": {"Price_LKR": 7500, "Interval_km": 40000, "Urgency": "HIGH"},
+                "Battery Health Check": {"Price_LKR": 5000, "Interval_km": 25000, "Urgency": "HIGH"},
+                "Transmission Fluid (EV)": {"Price_LKR": 3500, "Interval_km": 50000, "Urgency": "MEDIUM"}
+            }
+            return ev_parts
+        
+        elif fuel_type == "Diesel":
+            base_parts.update({
+                "Diesel Filter": {"Price_LKR": 2800, "Interval_km": 10000, "Urgency": "HIGH"},
+                "Carbon Buildup Cleaning": {"Price_LKR": 5500, "Interval_km": 50000, "Urgency": "MEDIUM"}
+            })
+            return base_parts
+        
+        elif fuel_type == "Hybrid":
+            base_parts.update({
+                "Hybrid Battery Check": {"Price_LKR": 6000, "Interval_km": 30000, "Urgency": "MEDIUM"},
+                "Transmission Fluid (CVT)": {"Price_LKR": 4200, "Interval_km": 40000, "Urgency": "MEDIUM"},
+                "Carbon Filter": {"Price_LKR": 3800, "Interval_km": 20000, "Urgency": "MEDIUM"}
+            })
+            return base_parts
+        
+        else:  # Petrol (default)
+            base_parts.update({
+                "Carbon Filter": {"Price_LKR": 3200, "Interval_km": 20000, "Urgency": "MEDIUM"}
+            })
+            return base_parts
+    
     def get_bike_parts_info(self):
-        """Get bike parts pricing and information"""
+        """Get bike parts pricing and information - No wheel alignment for bikes"""
         parts = {
             "Engine Oil (1L)": {"Price_LKR": 2800, "Interval_km": 3000, "Urgency": "CRITICAL"},
             "Air Filter": {"Price_LKR": 1200, "Interval_km": 10000, "Urgency": "MEDIUM"},
             "Spark Plug": {"Price_LKR": 850, "Interval_km": 5000, "Urgency": "HIGH"},
             "Chain Sprocket Kit": {"Price_LKR": 8500, "Interval_km": 15000, "Urgency": "HIGH"},
-            "Brake Shoes (Rear)": {"Price_LKR": 1500, "Interval_km": 10000, "Urgency": "HIGH"}
+            "Brake Shoes (Rear)": {"Price_LKR": 1500, "Interval_km": 10000, "Urgency": "HIGH"},
+            "Tire Pressure Check": {"Price_LKR": 300, "Interval_km": 2000, "Urgency": "CRITICAL"},
+            "Clutch Cable": {"Price_LKR": 900, "Interval_km": 12000, "Urgency": "MEDIUM"},
+            "Brake Fluid": {"Price_LKR": 1500, "Interval_km": 15000, "Urgency": "MEDIUM"}
         }
         return parts
     
@@ -169,9 +223,9 @@ class DatasetHandler:
         }
         return parts
     
-    def get_maintenance_recommendations(self, vehicle_type, current_odo, service_odo):
+    def get_maintenance_recommendations(self, vehicle_type, current_odo, service_odo, fuel_type=None):
         """
-        Get maintenance recommendations based on vehicle type and odometer
+        Get maintenance recommendations based on vehicle type, fuel type, and odometer
         Returns data from dataset instead of AI generation
         """
         km_since_service = current_odo - service_odo
@@ -191,6 +245,29 @@ class DatasetHandler:
         
         elif vehicle_type in ["Three-Wheeler", "Tuk", "Auto"]:
             parts_info = self.get_tuk_parts_info()
+            for part_name, info in parts_info.items():
+                if km_since_service >= info["Interval_km"]:
+                    recommendations.append({
+                        "name": part_name,
+                        "urgency": info["Urgency"],
+                        "estimated_cost_lkr": info["Price_LKR"],
+                        "why": f"Service interval of {info['Interval_km']} km exceeded",
+                        "risk_reduction_if_replaced": 5
+                    })
+        
+        else:  # Car or generic vehicle
+            # Determine fuel type if not provided
+            if not fuel_type:
+                if vehicle_type == "EV":
+                    fuel_type = "Electric"
+                elif vehicle_type == "Hybrid":
+                    fuel_type = "Hybrid"
+                elif vehicle_type == "Petrol/Diesel Car":
+                    fuel_type = "Petrol"
+                else:
+                    fuel_type = "Petrol"
+            
+            parts_info = self.get_car_parts_info(fuel_type)
             for part_name, info in parts_info.items():
                 if km_since_service >= info["Interval_km"]:
                     recommendations.append({

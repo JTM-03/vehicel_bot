@@ -159,9 +159,23 @@ def display_formatted_report(report_data):
 
 # Session State for Form Data (Temporary - Not Stored)
 if "vehicle_data" not in st.session_state: 
-    st.session_state.vehicle_data = {"model": "", "city": "", "odo": 0, "district": "", "v_type": "", "m_year": 2018}
+    st.session_state.vehicle_data = {"model": "", "city": "", "odo": 0, "district": "Colombo", "v_type": "Petrol/Diesel Car", "m_year": 2018, "s_odo": 0, "a_odo": 0, "tp_check": 0, "fuel_type": ""}
 if "trips_data" not in st.session_state:
     st.session_state.trips_data = []
+if "three_recent_trips" not in st.session_state:
+    st.session_state.three_recent_trips = [{"date": datetime.now().date(), "km": 0, "road": []}]*3
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+if "chat_photo" not in st.session_state:
+    st.session_state.chat_photo = None
+if "parts_replaced" not in st.session_state:
+    st.session_state.parts_replaced = []
+if "parts_dates" not in st.session_state:
+    st.session_state.parts_dates = {}
+if "parts_mileage" not in st.session_state:
+    st.session_state.parts_mileage = {}
+if "additional_notes" not in st.session_state:
+    st.session_state.additional_notes = ""
 
 districts = ["Ampara", "Anuradhapura", "Badulla", "Batticaloa", "Colombo", "Galle", "Gampaha", "Hambantota", "Jaffna", "Kalutara", "Kandy", "Kegalle", "Kilinochchi", "Kurunegala", "Mannar", "Matale", "Matara", "Moneragala", "Mullaitivu", "Nuwara Eliya", "Polonnaruwa", "Puttalam", "Ratnapura", "Trincomalee", "Vavuniya"]
 
@@ -392,12 +406,14 @@ with tab1:
         with col_refresh:
             refresh = st.form_submit_button("🔄 Refresh Form", use_container_width=True)
             if refresh:
-                st.session_state.vehicle_data = {"model": "", "city": "", "odo": 0, "district": "", "v_type": "", "fuel_type": "", "m_year": 2018}
+                # Clear all form data
+                st.session_state.vehicle_data = {"model": "", "city": "", "odo": 0, "district": "", "v_type": "Petrol/Diesel Car", "fuel_type": "", "m_year": 2018, "s_odo": 0, "a_odo": 0, "tp_check": 0}
                 st.session_state.trips_data = []
-                if "three_recent_trips" in st.session_state:
-                    st.session_state.three_recent_trips = [{"date": datetime.now().date(), "km": 0, "road": []}]*3
-                if "parts_replaced" in st.session_state:
-                    st.session_state.parts_replaced = []
+                st.session_state.three_recent_trips = [{"date": datetime.now().date(), "km": 0, "road": []}]*3
+                st.session_state.parts_replaced = []
+                st.session_state.parts_dates = {}
+                st.session_state.parts_mileage = {}
+                st.session_state.additional_notes = ""
                 st.rerun()
 
 
@@ -489,6 +505,7 @@ with tab2:
     # Handle clear chat first (before processing messages)
     if clear_button:
         st.session_state.chat_history = []
+        st.session_state.chat_photo = None
         st.rerun()
     
     # Process message
